@@ -1,0 +1,135 @@
+[
+  {
+    "id": "win-user-temp",
+    "label": "Tệp tạm của người dùng",
+    "os": "windows",
+    "path": "{temp}",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-system-temp",
+    "label": "Tệp tạm của Windows",
+    "os": "windows",
+    "path": "{windir}/Temp",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-update-download",
+    "label": "Bộ đệm Windows Update",
+    "os": "windows",
+    "path": "{windir}/SoftwareDistribution/Download",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-crash-dumps",
+    "label": "Tệp kết xuất lỗi ứng dụng",
+    "os": "windows",
+    "path": "{localappdata}/CrashDumps",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-error-reports",
+    "label": "Báo cáo lỗi Windows",
+    "os": "windows",
+    "path": "{programdata}/Microsoft/Windows/WER",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-old",
+    "label": "Bản cài Windows cũ",
+    "os": "windows",
+    "path": "{systemdrive}/Windows.old",
+    "safety": "can-xem-xet"
+  },
+  {
+    "id": "win-chrome-cache",
+    "label": "Bộ đệm Chrome",
+    "os": "windows",
+    "path": "{localappdata}/Google/Chrome/User Data/Default/Cache",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-edge-cache",
+    "label": "Bộ đệm Edge",
+    "os": "windows",
+    "path": "{localappdata}/Microsoft/Edge/User Data/Default/Cache",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-teams-cache",
+    "label": "Bộ đệm Microsoft Teams",
+    "os": "windows",
+    "path": "{appdata}/Microsoft/Teams/Cache",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-npm-cache",
+    "label": "Bộ đệm npm",
+    "os": "windows",
+    "path": "{localappdata}/npm-cache",
+    "safety": "an-toan"
+  },
+  {
+    "id": "win-pip-cache",
+    "label": "Bộ đệm pip",
+    "os": "windows",
+    "path": "{localappdata}/pip/Cache",
+    "safety": "an-toan"
+  },
+  {
+    "id": "mac-user-caches",
+    "label": "Bộ đệm ứng dụng",
+    "os": "macos",
+    "path": "{home}/Library/Caches",
+    "safety": "an-toan"
+  },
+  {
+    "id": "mac-user-logs",
+    "label": "Nhật ký ứng dụng",
+    "os": "macos",
+    "path": "{home}/Library/Logs",
+    "safety": "an-toan"
+  },
+  {
+    "id": "mac-xcode-derived-data",
+    "label": "Xcode DerivedData",
+    "os": "macos",
+    "path": "{home}/Library/Developer/Xcode/DerivedData",
+    "safety": "an-toan"
+  },
+  {
+    "id": "mac-xcode-device-support",
+    "label": "Xcode iOS DeviceSupport",
+    "os": "macos",
+    "path": "{home}/Library/Developer/Xcode/iOS DeviceSupport",
+    "safety": "an-toan"
+  },
+  {
+    "id": "mac-xcode-archives",
+    "label": "Xcode Archives",
+    "os": "macos",
+    "path": "{home}/Library/Developer/Xcode/Archives",
+    "safety": "can-xem-xet"
+  },
+  {
+    "id": "mac-mobile-backups",
+    "label": "Bản sao lưu iPhone, iPad",
+    "os": "macos",
+    "path": "{home}/Library/Application Support/MobileSync/Backup",
+    "safety": "can-xem-xet"
+  },
+  {
+    "id": "mac-trash",
+    "label": "Thùng rác",
+    "os": "macos",
+    "path": "{home}/.Trash",
+    "safety": "can-xem-xet"
+  },
+  {
+    "id": "mac-npm-cache",
+    "label": "Bộ đệm npm",
+    "os": "macos",
+    "path": "{home}/.npm/_cacache",
+    "safety": "an-toan"
+  }
+]
