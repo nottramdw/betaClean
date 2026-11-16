@@ -59,7 +59,7 @@ export function MemoryPage({ active }: { active: boolean }) {
       confirmLabel: force ? "Buộc dừng" : "Đóng",
       danger: force,
       verb: force ? "Đã buộc dừng" : "Đã đóng",
-      execute: () => stopProcesses(app.pids, force),
+      execute: () => stopProcesses(app.id, app.pids, force),
       onDone: () => void load(memoryUsage),
     });
   };

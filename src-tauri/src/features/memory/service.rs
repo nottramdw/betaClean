@@ -55,7 +55,8 @@ const CRITICAL_NAMES: &[&str] = &[
 ];
 
 const SYSTEM_PREFIXES: &[&str] = &[
-    "/system/",
+    "/system/library/",
+    "/system/volumes/preboot/cryptexes/os/",
     "/usr/libexec/",
     "/usr/sbin/",
     "/sbin/",
@@ -161,7 +162,17 @@ impl Context {
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "macos")]
+fn request_close(process: &Process) -> bool {
+    use objc2_app_kit::NSRunningApplication;
+    let pid = process.pid().as_u32() as libc::pid_t;
+    match NSRunningApplication::runningApplicationWithProcessIdentifier(pid) {
+        Some(app) => app.terminate(),
+        None => process.kill_with(Signal::Term).unwrap_or(false),
+    }
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
 fn request_close(process: &Process) -> bool {
     process.kill_with(Signal::Term).unwrap_or(false)
 }
@@ -238,6 +249,7 @@ impl Monitor {
 
     pub fn terminate(
         &self,
+        id: &str,
         pids: &[u32],
         force: bool,
         confirmed: bool,
@@ -245,62 +257,71 @@ impl Monitor {
         if !confirmed {
             return Err(NOT_CONFIRMED.to_string());
         }
+        let mut system = System::new().map_err(|e| e.to_string())?;
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing()
+                .with_memory()
+                .with_exe(UpdateKind::Always)
+                .with_user(UpdateKind::Always),
+        );
+        let context = Context::new(&system);
         let mut report = CleanupReport::default();
         let mut waiting = Vec::new();
-        self.with_system(|system| {
-            Self::refresh_all(system);
-            let context = Context::new(system);
-            for &raw in pids {
-                let pid = Pid::from_u32(raw);
-                let Some(process) = system.process(pid) else {
-                    report.succeeded.push(raw.to_string());
-                    continue;
-                };
-                let label = format!("{} (PID {raw})", process.name().to_string_lossy());
-                if let Some(reason) = context.protection(pid, process) {
-                    report.failed.push(Failure {
-                        target: label,
-                        error: reason.to_string(),
-                    });
-                    continue;
-                }
-                let sent = if force {
-                    process.kill()
-                } else {
-                    request_close(process)
-                };
-                if sent {
-                    waiting.push((pid, label, process.memory()));
-                } else {
-                    report.failed.push(Failure {
-                        target: label,
-                        error: if force {
-                            "Hệ điều hành từ chối yêu cầu dừng.".to_string()
-                        } else {
-                            "Tiến trình không nhận yêu cầu đóng; có thể buộc dừng.".to_string()
-                        },
-                    });
-                }
+        for &raw in pids {
+            let pid = Pid::from_u32(raw);
+            let Some(process) = system.process(pid) else {
+                continue;
+            };
+            if identity(process).0 != id {
+                continue;
             }
-        })?;
-        let deadline = Instant::now() + GRACE;
-        while !waiting.is_empty() {
-            let targets: Vec<Pid> = waiting.iter().map(|(pid, _, _)| *pid).collect();
-            self.with_system(|system| {
-                system.refresh_processes_specifics(
-                    ProcessesToUpdate::Some(&targets),
-                    true,
-                    ProcessRefreshKind::nothing(),
-                );
-                waiting.retain(|(pid, label, memory)| {
-                    if system.process(*pid).is_some() {
-                        return true;
-                    }
-                    report.succeeded.push(label.clone());
-                    report.bytes += memory;
-                    false
+            let label = format!("{} (PID {raw})", process.name().to_string_lossy());
+            if let Some(reason) = context.protection(pid, process) {
+                report.failed.push(Failure {
+                    target: label,
+                    error: reason.to_string(),
                 });
-            })?;
+                continue;
+            }
+            let follows_parent = process
+                .parent()
+                .is_some_and(|parent| pids.contains(&parent.as_u32()));
+            let sent = if force {
+                process.kill()
+            } else {
+                follows_parent || request_close(process)
+            };
+            if sent {
+                waiting.push((pid, label, process.memory()));
+            } else {
+                report.failed.push(Failure {
+                    target: label,
+                    error: if force {
+                        "Hệ điều hành từ chối yêu cầu dừng.".to_string()
+                    } else {
+                        "Tiến trình không nhận yêu cầu đóng; có thể buộc dừng.".to_string()
+                    },
+                });
+            }
+        }
+        let deadline = Instant::now() + GRACE;
+        loop {
+            let targets: Vec<Pid> = waiting.iter().map(|(pid, _, _)| *pid).collect();
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&targets),
+                true,
+                ProcessRefreshKind::nothing(),
+            );
+            waiting.retain(|(pid, label, memory)| {
+                if system.process(*pid).is_some() {
+                    return true;
+                }
+                report.succeeded.push(label.clone());
+                report.bytes += memory;
+                false
+            });
             if waiting.is_empty() || Instant::now() >= deadline {
                 break;
             }
@@ -346,11 +367,21 @@ mod tests {
     #[test]
     fn refuses_to_stop_itself() {
         let monitor = Monitor::default();
-        let report = monitor
-            .terminate(&[std::process::id()], false, true)
+        let me = std::process::id();
+        let report = monitor.snapshot().unwrap();
+        let own = report.apps.iter().find(|a| a.pids.contains(&me)).unwrap();
+        let result = monitor.terminate(&own.id, &[me], false, true).unwrap();
+        assert!(result.succeeded.is_empty());
+        assert_eq!(result.failed.len(), 1);
+        assert!(monitor.terminate(&own.id, &[me], false, false).is_err());
+    }
+
+    #[test]
+    fn skips_pid_that_belongs_to_another_app() {
+        let monitor = Monitor::default();
+        let result = monitor
+            .terminate("name:khong-ton-tai", &[std::process::id()], true, true)
             .unwrap();
-        assert!(report.succeeded.is_empty());
-        assert_eq!(report.failed.len(), 1);
-        assert!(monitor.terminate(&[1], false, false).is_err());
+        assert!(result.succeeded.is_empty() && result.failed.is_empty());
     }
 }

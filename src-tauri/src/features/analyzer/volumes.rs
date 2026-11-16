@@ -52,6 +52,28 @@ fn stat(path: &std::path::Path) -> Option<(u64, u64, bool)> {
     ))
 }
 
+#[cfg(target_os = "macos")]
+fn foreign_format(path: &std::path::Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    let mut info: libc::statfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statfs(c_path.as_ptr(), &mut info) } != 0 {
+        return false;
+    }
+    let name = unsafe { std::ffi::CStr::from_ptr(info.f_fstypename.as_ptr()) };
+    matches!(
+        name.to_bytes(),
+        b"ntfs" | b"msdos" | b"exfat" | b"ufsd_NTFS" | b"tuxera_ntfs"
+    )
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn foreign_format(_path: &std::path::Path) -> bool {
+    false
+}
+
 #[cfg(unix)]
 pub fn list() -> Vec<Volume> {
     let mut mounts = vec![std::path::PathBuf::from("/")];
@@ -69,7 +91,7 @@ pub fn list() -> Vec<Volume> {
         .enumerate()
         .filter_map(|(index, m)| {
             let (total, free, read_only) = stat(&m)?;
-            let external_image = index > 0 && read_only;
+            let external_image = index > 0 && read_only && !foreign_format(&m);
             (total > 0 && !external_image && seen.insert((total, free)))
                 .then(|| volume(m.to_string_lossy().into_owned(), total, free))
         })

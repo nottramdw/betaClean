@@ -110,6 +110,20 @@ pub fn children(dir: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn targets_usage(targets: &[String], stop: &AtomicBool) -> (u64, u64) {
+    targets.iter().fold((0, 0), |(size, count), target| {
+        let path = Path::new(target);
+        match fs::symlink_metadata(path) {
+            Ok(meta) if meta.is_dir() => {
+                let (s, c) = dir_usage(path, stop);
+                (size + s, count + c)
+            }
+            Ok(meta) if meta.is_file() => (size + disk_size::on_disk(path, &meta), count + 1),
+            _ => (size, count),
+        }
+    })
+}
+
 pub fn scan_locations(rules: &[JunkRule], stop: &AtomicBool) -> Result<Vec<JunkLocation>, String> {
     let targets: Vec<(&JunkRule, PathBuf)> = rules
         .iter()
@@ -121,11 +135,12 @@ pub fn scan_locations(rules: &[JunkRule], stop: &AtomicBool) -> Result<Vec<JunkL
             .iter()
             .map(|(rule, path)| {
                 scope.spawn(move || {
-                    let (size, file_count) = dir_usage(path, stop);
-                    let targets = if rule.safety == Safety::ChiThongBao {
-                        Vec::new()
+                    let (targets, (size, file_count)) = if rule.safety == Safety::ChiThongBao {
+                        (Vec::new(), dir_usage(path, stop))
                     } else {
-                        children(path)
+                        let targets = children(path);
+                        let usage = targets_usage(&targets, stop);
+                        (targets, usage)
                     };
                     JunkLocation {
                         id: rule.id.clone(),
@@ -207,8 +222,11 @@ mod tests {
         fs::write(root.join("f1"), vec![0u8; 100]).unwrap();
         fs::write(root.join("a").join("b").join("f2"), vec![0u8; 50]).unwrap();
         let usage = dir_usage(&root, &AtomicBool::new(false));
+        let targets = children(&root);
+        let counted = targets_usage(&targets, &AtomicBool::new(false));
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(usage, (150, 2));
+        assert_eq!(counted, usage);
     }
 
     #[test]

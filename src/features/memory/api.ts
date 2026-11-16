@@ -24,6 +24,6 @@ export function memoryUsage(): Promise<MemoryReport> {
   return invoke("memory_usage");
 }
 
-export function stopProcesses(pids: number[], force: boolean): Promise<CleanupReport> {
-  return invoke("stop_processes", { pids, force, confirmed: true });
+export function stopProcesses(id: string, pids: number[], force: boolean): Promise<CleanupReport> {
+  return invoke("stop_processes", { id, pids, force, confirmed: true });
 }

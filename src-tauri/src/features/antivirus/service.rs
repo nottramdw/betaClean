@@ -201,7 +201,7 @@ fn scan_clamav(
     db_dir: &Path,
     paths: &[String],
     stop: &AtomicBool,
-) -> Result<Vec<Threat>, String> {
+) -> Result<(Vec<Threat>, Option<String>), String> {
     if !database_ready(db_dir) {
         return Err("CSDL ClamAV chưa sẵn sàng, cần cập nhật khi có mạng.".to_string());
     }
@@ -212,12 +212,19 @@ fn scan_clamav(
     cmd.args(paths);
     let output = process::run(cmd, stop)?;
     let threats = parse_clamscan(&output.stdout);
-    match output.code {
-        0 | 1 => Ok(threats),
-        code if threats.is_empty() && has_fatal_error(&output.stderr) => {
-            Err(format!("clamscan lỗi ({code}): {}", output.stderr.trim()))
+    let failure = || {
+        let detail = output.stderr.trim();
+        if detail.is_empty() {
+            format!("clamscan dừng bất thường (mã {}).", output.code)
+        } else {
+            format!("clamscan lỗi ({}): {detail}", output.code)
         }
-        _ => Ok(threats),
+    };
+    match output.code {
+        0 | 1 => Ok((threats, None)),
+        2 if !has_fatal_error(&output.stderr) => Ok((threats, None)),
+        _ if threats.is_empty() => Err(failure()),
+        _ => Ok((threats, Some(failure()))),
     }
 }
 
@@ -272,7 +279,12 @@ pub fn scan(
     for engine in engines {
         let outcome = match engine {
             Engine::Clamav => match locate("clamscan", bundled) {
-                Some(clamscan) => scan_clamav(&clamscan, db_dir, &paths, stop),
+                Some(clamscan) => {
+                    scan_clamav(&clamscan, db_dir, &paths, stop).map(|(threats, warning)| {
+                        result.errors.extend(warning);
+                        threats
+                    })
+                }
                 None => Err("Không tìm thấy clamscan.".to_string()),
             },
             Engine::Defender => match locate_defender() {
