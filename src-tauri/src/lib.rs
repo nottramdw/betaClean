@@ -1,6 +1,6 @@
 mod features;
 
-use features::{junk, scan, system};
+use features::{junk, scan, system, unused};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +15,7 @@ pub fn run() {
             scan::commands::scan_empty_folders,
             scan::commands::cancel_scan,
             junk::commands::scan_junk_locations,
+            unused::commands::scan_unused_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
