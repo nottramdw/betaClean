@@ -16,3 +16,4 @@ Thumbs.db
 src-tauri/resources/clamav/*
 !src-tauri/resources/clamav/.keep
 release/
+*.tsbuildinfo
