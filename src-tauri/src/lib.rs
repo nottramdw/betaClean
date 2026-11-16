@@ -1,6 +1,6 @@
 mod features;
 
-use features::{junk, scan, system, unused};
+use features::{antivirus, junk, scan, system, unused};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +16,9 @@ pub fn run() {
             scan::commands::cancel_scan,
             junk::commands::scan_junk_locations,
             unused::commands::scan_unused_files,
+            antivirus::commands::antivirus_status,
+            antivirus::commands::update_virus_database,
+            antivirus::commands::scan_viruses,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
