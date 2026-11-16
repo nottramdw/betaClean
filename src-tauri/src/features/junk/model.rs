@@ -27,4 +27,5 @@ pub struct JunkLocation {
     pub safety: Safety,
     pub size: u64,
     pub file_count: u64,
+    pub targets: Vec<String>,
 }

@@ -1,1 +1,38 @@
+@import "@fontsource/be-vietnam-pro/400.css";
+@import "@fontsource/be-vietnam-pro/500.css";
+@import "@fontsource/be-vietnam-pro/600.css";
+@import "@fontsource/be-vietnam-pro/700.css";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --color-primary: #0f766e;
+  --color-primary-hover: #0d645d;
+  --color-primary-soft: #e6f4f2;
+  --color-canvas: #f6f8f8;
+  --color-line: #e2e8f0;
+  --color-safe: #15803d;
+  --color-review: #b45309;
+  --color-info: #475569;
+  --color-danger: #b91c1c;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: #0f172a;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.selectable {
+  user-select: text;
+}

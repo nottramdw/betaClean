@@ -2,8 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use super::model::{JunkLocation, JunkRule};
+use super::model::{JunkLocation, JunkRule, Safety};
 
+const MAX_TARGETS: usize = 2_000;
 const RULES: &str = include_str!("../../../rules/junk-locations.json");
 
 pub fn all_rules() -> Result<Vec<JunkRule>, String> {
@@ -83,6 +84,18 @@ pub fn dir_usage(root: &Path, stop: &AtomicBool) -> (u64, u64) {
     (size, count)
 }
 
+pub fn children(dir: &Path) -> Vec<String> {
+    fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .take(MAX_TARGETS)
+                .map(|e| e.path().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 pub fn scan_locations(rules: &[JunkRule], stop: &AtomicBool) -> Result<Vec<JunkLocation>, String> {
     let targets: Vec<(&JunkRule, PathBuf)> = rules
         .iter()
@@ -95,6 +108,11 @@ pub fn scan_locations(rules: &[JunkRule], stop: &AtomicBool) -> Result<Vec<JunkL
             .map(|(rule, path)| {
                 scope.spawn(move || {
                     let (size, file_count) = dir_usage(path, stop);
+                    let targets = if rule.safety == Safety::ChiThongBao {
+                        Vec::new()
+                    } else {
+                        children(path)
+                    };
                     JunkLocation {
                         id: rule.id.clone(),
                         label: rule.label.clone(),
@@ -102,6 +120,7 @@ pub fn scan_locations(rules: &[JunkRule], stop: &AtomicBool) -> Result<Vec<JunkL
                         safety: rule.safety,
                         size,
                         file_count,
+                        targets,
                     }
                 })
             })

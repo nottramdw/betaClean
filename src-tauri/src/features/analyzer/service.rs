@@ -18,7 +18,6 @@ const DAY: u64 = 86_400;
 const DEFAULT_UNUSED_DAYS: u64 = 180;
 const HOTSPOT_LIMIT: usize = 20;
 const HOTSPOT_MIN: u64 = 50 * 1024 * 1024;
-const MAX_TARGETS: usize = 2_000;
 
 pub fn safety_weight(safety: Safety) -> f64 {
     match safety {
@@ -51,18 +50,6 @@ fn default_roots() -> Vec<PathBuf> {
         .collect()
 }
 
-fn children(dir: &Path) -> Vec<String> {
-    fs::read_dir(dir)
-        .map(|entries| {
-            entries
-                .flatten()
-                .take(MAX_TARGETS)
-                .map(|e| text(&e.path()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 fn location_text(safety: Safety) -> (&'static str, &'static str) {
     match safety {
         Safety::AnToan => (
@@ -82,12 +69,6 @@ fn location_text(safety: Safety) -> (&'static str, &'static str) {
 
 fn location_finding(location: JunkLocation) -> Finding {
     let (reason, action) = location_text(location.safety);
-    let path = PathBuf::from(&location.path);
-    let targets = if location.safety == Safety::ChiThongBao {
-        Vec::new()
-    } else {
-        children(&path)
-    };
     Finding {
         score: score(location.size, location.safety, None),
         id: location.id,
@@ -99,7 +80,7 @@ fn location_finding(location: JunkLocation) -> Finding {
         reason: reason.to_string(),
         action: action.to_string(),
         idle_days: None,
-        targets,
+        targets: location.targets,
     }
 }
 
