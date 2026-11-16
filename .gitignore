@@ -13,3 +13,5 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+src-tauri/resources/clamav/*
+!src-tauri/resources/clamav/.keep

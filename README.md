@@ -22,6 +22,7 @@ Tauri 2 (Rust), React, TypeScript, Tailwind CSS, ClamAV.
 | `npm run lint`                              | ESLint và Prettier                |
 | `npm run build`                             | Build giao diện                   |
 | `npm run tauri build`                       | Build bản cài                     |
+| `npm run fetch:clamav`                      | Tải ClamAV vào tài nguyên         |
 | `cargo clippy --all-targets -- -D warnings` | Lint Rust (trong `src-tauri`)     |
 | `cargo test`                                | Kiểm thử Rust (trong `src-tauri`) |
 

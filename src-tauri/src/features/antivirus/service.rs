@@ -109,7 +109,7 @@ pub fn update_database(
     let mut cmd = process::command(&freshclam);
     cmd.arg(format!("--config-file={}", config.display()))
         .arg(format!("--datadir={}", db_dir.display()))
-        .arg("--stdout");
+        .arg("--quiet");
     let output = process::run(cmd, stop)?;
     if output.code == 0 {
         Ok(output.stdout)
@@ -173,17 +173,21 @@ fn scan_clamav(
         .arg(format!("--database={}", db_dir.display()))
         .args(paths);
     let output = process::run(cmd, stop)?;
+    let threats = parse_clamscan(&output.stdout);
     match output.code {
-        0 | 1 => Ok(parse_clamscan(&output.stdout)),
-        code => {
-            let threats = parse_clamscan(&output.stdout);
-            if threats.is_empty() {
-                Err(format!("clamscan lỗi ({code}): {}", output.stderr.trim()))
-            } else {
-                Ok(threats)
-            }
+        0 | 1 => Ok(threats),
+        code if threats.is_empty() && has_fatal_error(&output.stderr) => {
+            Err(format!("clamscan lỗi ({code}): {}", output.stderr.trim()))
         }
+        _ => Ok(threats),
     }
+}
+
+pub fn has_fatal_error(stderr: &str) -> bool {
+    stderr
+        .lines()
+        .map(str::trim)
+        .any(|line| line.starts_with("ERROR:") || line.starts_with("LibClamAV Error:"))
 }
 
 fn scan_defender(
@@ -254,6 +258,18 @@ pub fn scan(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn locked_files_are_not_fatal() {
+        let stderr = "LibClamAV Warning: Can't open file C:\\pagefile.sys: 32\nWARNING: Can't open file C:\\pagefile.sys: Invalid argument\n";
+        assert!(!super::has_fatal_error(stderr));
+        assert!(super::has_fatal_error(
+            "LibClamAV Error: cli_loaddb(): No supported database files found\n"
+        ));
+        assert!(super::has_fatal_error(
+            "ERROR: Can't initialize the internal logger\n"
+        ));
+    }
+
     use super::*;
 
     #[test]
