@@ -225,6 +225,7 @@ pub fn has_fatal_error(stderr: &str) -> bool {
     stderr
         .lines()
         .map(str::trim)
+        .filter(|line| !line.contains("cl_scandesc_callback"))
         .any(|line| line.starts_with("ERROR:") || line.starts_with("LibClamAV Error:"))
 }
 
@@ -317,6 +318,9 @@ mod tests {
     fn locked_files_are_not_fatal() {
         let stderr = "LibClamAV Warning: Can't open file C:\\pagefile.sys: 32\nWARNING: Can't open file C:\\pagefile.sys: Invalid argument\n";
         assert!(!super::has_fatal_error(stderr));
+        assert!(!super::has_fatal_error(
+            "LibClamAV Error: cl_scandesc_callback: Can't fstat descriptor 3\n"
+        ));
         assert!(super::has_fatal_error(
             "LibClamAV Error: cli_loaddb(): No supported database files found\n"
         ));
