@@ -3,7 +3,14 @@ import type { Safety } from "../../shared/safety";
 
 export type Volume = { mount: string; total: number; free: number; used: number };
 
-export type Category = "vi-tri-rac" | "tep-he-thong" | "lap-trinh" | "tai-ve" | "lau-khong-dung";
+export type Category =
+  | "vi-tri-rac"
+  | "tep-he-thong"
+  | "lap-trinh"
+  | "tai-ve"
+  | "lau-khong-dung"
+  | "tep-lon"
+  | "trung-lap";
 
 export type Finding = {
   id: string;
@@ -38,6 +45,8 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   "lap-trinh": "Lập trình",
   "tai-ve": "Tải về",
   "lau-khong-dung": "Lâu không dùng",
+  "tep-lon": "Tệp lớn",
+  "trung-lap": "Trùng lặp",
 };
 
 export function listVolumes(): Promise<Volume[]> {

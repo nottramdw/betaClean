@@ -1,84 +1,58 @@
-import { Gauge, HardDrive, Info, Play, Square, Trash2 } from "lucide-react";
-import { useEffect, useMemo } from "react";
-import { cancelScan } from "../scan/api";
-import { moveToTrash } from "../cleanup/api";
+import { Gauge, Play, ShieldAlert, Square, Trash2 } from "lucide-react";
+import { useEffect } from "react";
+import { ThreatTable } from "../antivirus/threat-table";
+import { moveToTrash, quarantineFiles } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
 import { formatBytes, formatDate, shortenPath } from "../../shared/format";
+import { useElapsed } from "../../shared/hooks/use-elapsed";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
-import { isCleanable } from "../../shared/safety";
 import { ActionBar } from "../../shared/ui/action-bar";
-import { SafetyBadge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
 import { EmptyState, Notice, PageHeader, Panel, StatCard } from "../../shared/ui/page";
+import { ProgressPanel } from "../../shared/ui/progress-panel";
 import { ScanProgressPanel } from "../../shared/ui/scan-progress-panel";
-import { SelectAll } from "../../shared/ui/select-all";
-import { Checkbox, Table, Td, Th } from "../../shared/ui/table";
-import {
-  analyzeDisk,
-  CATEGORY_LABEL,
-  listVolumes,
-  type AnalysisReport,
-  type Finding,
-  type Volume,
-} from "./api";
-
-function VolumeCard({ volume }: { volume: Volume }) {
-  const percent = volume.total > 0 ? (volume.used / volume.total) * 100 : 0;
-  const tone = percent >= 90 ? "bg-danger" : percent >= 75 ? "bg-review" : "bg-primary";
-  return (
-    <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 text-sm text-slate-500">
-        <HardDrive size={16} />Ổ {volume.mount}
-      </div>
-      <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900">
-        {formatBytes(volume.free)}
-        <span className="ml-1 text-sm font-medium text-slate-500">còn trống</span>
-      </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${percent}%` }} />
-      </div>
-      <p className="mt-2 text-xs text-slate-500">
-        Đã dùng {formatBytes(volume.used)} / {formatBytes(volume.total)} ({Math.round(percent)}%)
-      </p>
-    </div>
-  );
-}
-
-function selectable(finding: Finding): boolean {
-  return isCleanable(finding.safety) && finding.targets.length > 0;
-}
+import { listVolumes, type Volume } from "./api";
+import { FindingsTable } from "./findings-table";
+import { isSelectable, reclaimable, STEP_LABEL } from "./full-scan";
+import { useFullScan } from "./use-full-scan";
+import { VolumeCard } from "./volume-card";
 
 export function OverviewPage() {
   const volumes = useTask<Volume[]>();
-  const analysis = useTask<AnalysisReport>();
+  const scan = useFullScan();
   const selection = useSelection();
+  const threatSelection = useSelection();
   const cleanup = useCleanupAction();
+  const elapsed = useElapsed(scan.running);
   const { run: loadVolumes } = volumes;
 
   useEffect(() => {
     void loadVolumes(listVolumes);
   }, [loadVolumes]);
 
-  const report = analysis.data;
-  const findings = useMemo(() => report?.findings ?? [], [report]);
-  const selectableIds = findings.filter(selectable).map((f) => f.id);
+  const result = scan.result;
+  const findings = result?.findings ?? [];
+  const threats = result?.threats ?? [];
   const chosen = findings.filter((f) => selection.selected.has(f.id));
   const chosenSize = chosen.reduce((sum, f) => sum + f.size, 0);
-  const shownVolumes = report?.volumes ?? volumes.data ?? [];
+  const chosenThreats = threats.filter((t) => threatSelection.selected.has(t.path));
+  const shownVolumes = result?.report.volumes ?? volumes.data ?? [];
+  const step = scan.step;
 
   const start = async () => {
     selection.clear();
+    threatSelection.clear();
     cleanup.setNotice(null);
-    const result = await analysis.run(analyzeDisk);
-    if (result) {
+    const next = await scan.start();
+    if (next) {
       selection.replace(
-        result.findings
-          .filter((f) => f.safety === "an-toan" && f.targets.length > 0)
-          .map((f) => f.id),
+        next.findings.filter((f) => f.safety === "an-toan" && isSelectable(f)).map((f) => f.id),
       );
+      threatSelection.replace(next.threats.map((t) => t.path));
     }
+    void loadVolumes(listVolumes);
   };
 
   const trash = () => {
@@ -89,9 +63,9 @@ export function OverviewPage() {
       confirmLabel: "Chuyển vào Thùng rác",
       verb: "Đã chuyển vào Thùng rác",
       execute: () => moveToTrash(targets),
-      onDone: (result) => {
-        const done = succeededSet(result);
-        analysis.setData((current) =>
+      onDone: (report) => {
+        const done = succeededSet(report);
+        scan.setResult((current) =>
           current
             ? {
                 ...current,
@@ -105,26 +79,55 @@ export function OverviewPage() {
     });
   };
 
+  const quarantine = () => {
+    const items = chosenThreats.map((t) => ({ path: t.path, reason: t.names.join(", ") }));
+    cleanup.request({
+      title: "Cách ly tệp nhiễm",
+      message: `Di chuyển ${items.length} tệp vào Khu cách ly. Có thể khôi phục khi cần.`,
+      confirmLabel: "Cách ly",
+      danger: true,
+      verb: "Đã cách ly",
+      execute: () => quarantineFiles(items),
+      onDone: (report) => {
+        const done = succeededSet(report);
+        scan.setResult((current) =>
+          current
+            ? { ...current, threats: current.threats.filter((t) => !done.has(t.path)) }
+            : current,
+        );
+        threatSelection.clear();
+      },
+    });
+  };
+
   return (
     <div className={chosen.length > 0 ? "pb-20" : ""}>
       <PageHeader
         title="Tổng quan"
-        description="Phân tích dung lượng offline theo bộ quy tắc của betaClean, đề xuất mục nên dọn."
+        description="Quét toàn bộ: tệp rác, tệp lâu không dùng, tệp lớn, tệp trùng lặp và virus. Mục cần xem xét hiển thị trước."
         actions={
-          analysis.running ? (
-            <Button icon={<Square size={14} />} onClick={() => void cancelScan()}>
+          scan.running ? (
+            <Button icon={<Square size={14} />} onClick={scan.stop}>
               Dừng
             </Button>
           ) : (
             <Button variant="primary" icon={<Play size={14} />} onClick={() => void start()}>
-              {report ? "Phân tích lại" : "Phân tích"}
+              {result ? "Quét lại" : "Quét toàn bộ"}
             </Button>
           )
         }
       />
 
       {cleanup.notice}
-      {analysis.error && <Notice notice={{ kind: "error", text: analysis.error }} />}
+      {scan.errors.length > 0 && (
+        <Notice
+          notice={{
+            kind: "warning",
+            text: "Một số bước không hoàn tất.",
+            details: scan.errors,
+          }}
+        />
+      )}
       {volumes.error && <Notice notice={{ kind: "error", text: volumes.error }} />}
 
       <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -132,114 +135,91 @@ export function OverviewPage() {
           <VolumeCard key={volume.mount} volume={volume} />
         ))}
         <StatCard
+          label="Cần xem xét"
+          value={result ? formatBytes(reclaimable(findings, "can-xem-xet")) : "—"}
+          tone="text-review"
+          hint="Tải về, tệp lớn, trùng lặp, lâu không dùng"
+        />
+        <StatCard
           label="Có thể dọn an toàn"
-          value={report ? formatBytes(report.reclaimableSafe) : "—"}
+          value={result ? formatBytes(reclaimable(findings, "an-toan")) : "—"}
           tone="text-safe"
           hint="Bộ nhớ đệm, tệp tạm tự sinh lại"
         />
-        <StatCard
-          label="Cần xem xét"
-          value={report ? formatBytes(report.reclaimableReview) : "—"}
-          tone="text-review"
-          hint="Tải về, bộ cài cũ, tệp lớn lâu không dùng"
-        />
       </div>
 
-      <ScanProgressPanel
-        tool="analyzer"
-        running={analysis.running}
-        root={report?.roots[0] ?? "thư mục người dùng"}
-      />
+      {step && step.id !== "virus" && (
+        <ScanProgressPanel
+          tool={step.id}
+          running
+          prefix={`Bước ${step.index}/${step.total}: ${STEP_LABEL[step.id]}`}
+        />
+      )}
+      {step?.id === "virus" && (
+        <ProgressPanel
+          label={`Bước ${step.index}/${step.total}: ${STEP_LABEL.virus}`}
+          detail={`${elapsed} giây`}
+          percent={null}
+        />
+      )}
 
-      {!report && !analysis.running && (
+      {!result && !scan.running && (
         <Panel>
           <EmptyState
             icon={<Gauge size={22} />}
-            title="Chưa có kết quả phân tích"
-            hint="Bấm Phân tích để duyệt thư mục người dùng, đối chiếu vị trí rác đã biết và xếp hạng mục nên dọn. Không có tệp nào bị xoá khi chưa xác nhận."
+            title="Chưa quét"
+            hint="Bấm Quét toàn bộ để chạy lần lượt mọi công cụ trên thư mục người dùng. Quá trình có thể mất vài phút đến vài chục phút. Không có tệp nào bị xoá khi chưa xác nhận."
           />
         </Panel>
       )}
 
-      {report && (
+      {result && threats.length > 0 && (
+        <Panel
+          className="mb-6 border-red-200"
+          title={<span className="text-danger">Mối đe doạ ({threats.length})</span>}
+          aside={
+            <Button
+              variant="danger"
+              className="h-8 px-3"
+              icon={<ShieldAlert size={14} />}
+              disabled={chosenThreats.length === 0}
+              onClick={quarantine}
+            >
+              Cách ly
+            </Button>
+          }
+        >
+          <ThreatTable
+            threats={threats}
+            selected={threatSelection.selected}
+            onToggle={threatSelection.toggle}
+            onSetMany={threatSelection.setMany}
+          />
+        </Panel>
+      )}
+
+      {result && (
         <div className="grid grid-cols-12 gap-6">
           <Panel
             className="col-span-12 xl:col-span-8"
             title={`Đề xuất dọn dẹp (${findings.length})`}
-            aside={`Đã phân tích ${formatBytes(report.scannedBytes)} · ${formatDate(report.generatedAt)}`}
+            aside={`${result.virusSkipped ? "Bỏ qua quét virus · " : ""}${formatDate(result.report.generatedAt)}`}
           >
             {findings.length === 0 ? (
               <EmptyState icon={<Gauge size={22} />} title="Không có đề xuất nào" />
             ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <Th className="w-12">
-                      <SelectAll
-                        ids={selectableIds}
-                        selected={selection.selected}
-                        onChange={selection.setMany}
-                      />
-                    </Th>
-                    <Th>Mục</Th>
-                    <Th className="w-36">Mức an toàn</Th>
-                    <Th className="w-28 text-right">Dung lượng</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {findings.map((finding) => (
-                    <tr key={finding.id} className="hover:bg-slate-50">
-                      <Td>
-                        {selectable(finding) ? (
-                          <Checkbox
-                            label={finding.title}
-                            checked={selection.selected.has(finding.id)}
-                            onChange={() => selection.toggle(finding.id)}
-                          />
-                        ) : (
-                          <Info size={16} className="text-info" />
-                        )}
-                      </Td>
-                      <Td>
-                        <p className="truncate font-medium text-slate-900">
-                          {finding.title}
-                          <span className="ml-2 text-xs font-normal text-slate-400">
-                            {CATEGORY_LABEL[finding.category]}
-                          </span>
-                        </p>
-                        <p
-                          className="selectable truncate font-mono text-xs text-slate-500"
-                          title={finding.path}
-                        >
-                          {finding.path}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {finding.reason}{" "}
-                          <span
-                            className={
-                              finding.safety === "chi-thong-bao" ? "font-medium text-info" : ""
-                            }
-                          >
-                            {finding.action}
-                          </span>
-                        </p>
-                      </Td>
-                      <Td>
-                        <SafetyBadge safety={finding.safety} />
-                      </Td>
-                      <Td className="text-right font-medium tabular-nums text-slate-700">
-                        {formatBytes(finding.size)}
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+              <FindingsTable
+                findings={findings}
+                selected={selection.selected}
+                onToggle={selection.toggle}
+                onSetMany={(ids, on) => selection.setMany(ids, on)}
+              />
             )}
           </Panel>
 
           <Panel className="col-span-12 xl:col-span-4" title="Vùng chiếm nhiều dung lượng">
             <ul className="divide-y divide-slate-100">
-              {report.hotspots.map((spot) => (
+              {result.report.hotspots.map((spot) => (
                 <li key={spot.path} className="px-5 py-3">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span

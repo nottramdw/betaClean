@@ -1,29 +1,20 @@
-import { Database, Play, RefreshCw, ShieldAlert, ShieldCheck, ShieldOff } from "lucide-react";
+import { Play, ShieldAlert, ShieldCheck, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { quarantineFiles } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
-import { errorText, fileName, formatDate, joinPath, parentDir } from "../../shared/format";
+import { joinPath } from "../../shared/format";
 import { useElapsed } from "../../shared/hooks/use-elapsed";
 import { useHomeDir } from "../../shared/hooks/use-home-dir";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
-import { Badge, ThreatBadge } from "../../shared/ui/badge";
 import { Button } from "../../shared/ui/button";
-import { EmptyState, Notice, PageHeader, Panel, type NoticeData } from "../../shared/ui/page";
+import { EmptyState, Notice, PageHeader, Panel } from "../../shared/ui/page";
 import { ProgressPanel } from "../../shared/ui/progress-panel";
-import { SelectAll } from "../../shared/ui/select-all";
-import { Checkbox, PathCell, Table, Td, Th } from "../../shared/ui/table";
-import {
-  antivirusStatus,
-  ENGINE_LABEL,
-  scanViruses,
-  updateVirusDatabase,
-  type AntivirusStatus,
-  type Engine,
-  type VirusScanResult,
-} from "./api";
+import { antivirusStatus, ENGINE_LABEL, type AntivirusStatus, type VirusScanResult } from "./api";
+import { hasEngine, mergeThreats, scanWithFreshDatabase, type MergedThreat } from "./engine";
+import { ThreatTable } from "./threat-table";
 
 type Scope = "home" | "downloads" | "desktop";
 
@@ -33,40 +24,6 @@ const SCOPES: { id: Scope; label: string; folder: string | null }[] = [
   { id: "home", label: "Toàn bộ thư mục người dùng", folder: null },
 ];
 
-type MergedThreat = { path: string; names: string[]; engines: Engine[] };
-
-function merge(result: VirusScanResult): MergedThreat[] {
-  const byPath = new Map<string, MergedThreat>();
-  for (const threat of result.threats) {
-    const entry = byPath.get(threat.path) ?? { path: threat.path, names: [], engines: [] };
-    if (!entry.names.includes(threat.name)) entry.names.push(threat.name);
-    if (!entry.engines.includes(threat.engine)) entry.engines.push(threat.engine);
-    byPath.set(threat.path, entry);
-  }
-  return [...byPath.values()];
-}
-
-function EngineCard({ name, path }: { name: string; path?: string | null }) {
-  return (
-    <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-slate-800">{name}</span>
-        {path ? (
-          <Badge className="border-green-200 bg-green-50 text-safe">Sẵn sàng</Badge>
-        ) : (
-          <Badge className="border-slate-200 bg-slate-50 text-info">Không có</Badge>
-        )}
-      </div>
-      <p
-        className="selectable mt-2 truncate font-mono text-xs text-slate-500"
-        title={path ?? undefined}
-      >
-        {path ?? "Chưa cài đặt hoặc không hỗ trợ trên hệ điều hành này"}
-      </p>
-    </div>
-  );
-}
-
 export function AntivirusPage() {
   const home = useHomeDir();
   const status = useTask<AntivirusStatus>();
@@ -74,8 +31,6 @@ export function AntivirusPage() {
   const selection = useSelection();
   const cleanup = useCleanupAction();
   const [scope, setScope] = useState<Scope>("downloads");
-  const [updating, setUpdating] = useState(false);
-  const [updateNotice, setUpdateNotice] = useState<NoticeData | null>(null);
   const [threats, setThreats] = useState<MergedThreat[]>([]);
   const elapsed = useElapsed(scan.running);
   const { run: loadStatus } = status;
@@ -84,27 +39,8 @@ export function AntivirusPage() {
     void loadStatus(antivirusStatus);
   }, [loadStatus]);
 
-  const info = status.data;
-  const hasEngine = Boolean(info && ((info.clamscan && info.databaseReady) || info.defender));
+  const ready = status.data ? hasEngine(status.data) : false;
   const chosen = threats.filter((t) => selection.selected.has(t.path));
-
-  const update = async () => {
-    setUpdating(true);
-    setUpdateNotice(null);
-    try {
-      const output = await updateVirusDatabase();
-      setUpdateNotice({
-        kind: "success",
-        text: "Đã cập nhật cơ sở dữ liệu virus.",
-        details: output ? [output] : [],
-      });
-      void loadStatus(antivirusStatus);
-    } catch (e) {
-      setUpdateNotice({ kind: "error", text: errorText(e) });
-    } finally {
-      setUpdating(false);
-    }
-  };
 
   const start = async () => {
     if (!home) return;
@@ -112,9 +48,9 @@ export function AntivirusPage() {
     const path = target?.folder ? joinPath(home, target.folder) : home;
     selection.clear();
     setThreats([]);
-    const result = await scan.run(() => scanViruses([path]));
+    const result = await scan.run(() => scanWithFreshDatabase([path]));
     if (result) {
-      const merged = merge(result);
+      const merged = mergeThreats(result);
       setThreats(merged);
       selection.replace(merged.map((t) => t.path));
     }
@@ -141,60 +77,25 @@ export function AntivirusPage() {
     <div className={chosen.length > 0 ? "pb-20" : ""}>
       <PageHeader
         title="Quét virus"
-        description="Quét offline bằng ClamAV và Microsoft Defender có sẵn trên máy. Chỉ cần mạng khi cập nhật cơ sở dữ liệu."
+        description="Quét offline trên máy. Cơ sở dữ liệu virus tự cập nhật khi có kết nối mạng."
         actions={
           <Button
             variant="primary"
             icon={<Play size={14} />}
             onClick={() => void start()}
-            disabled={!home || !hasEngine || scan.running}
+            disabled={!home || !ready || scan.running}
           >
             Quét
           </Button>
         }
       />
 
-      {updateNotice && <Notice notice={updateNotice} onClose={() => setUpdateNotice(null)} />}
       {cleanup.notice}
       {status.error && <Notice notice={{ kind: "error", text: status.error }} />}
       {scan.error && <Notice notice={{ kind: "error", text: scan.error }} />}
-      {info && !hasEngine && (
-        <Notice
-          notice={{
-            kind: "warning",
-            text: "Chưa có công cụ quét khả dụng. Cài ClamAV rồi cập nhật cơ sở dữ liệu, hoặc dùng Microsoft Defender trên Windows.",
-          }}
-        />
+      {status.data && !ready && (
+        <Notice notice={{ kind: "warning", text: "Chưa có công cụ quét khả dụng trên máy này." }} />
       )}
-
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        <EngineCard name="ClamAV" path={info?.clamscan} />
-        <EngineCard name="Microsoft Defender" path={info?.defender} />
-        <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <Database size={16} />
-              Cơ sở dữ liệu ClamAV
-            </span>
-            {info?.databaseReady ? (
-              <Badge className="border-green-200 bg-green-50 text-safe">Có sẵn</Badge>
-            ) : (
-              <Badge className="border-amber-200 bg-amber-50 text-review">Chưa có</Badge>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Cập nhật lần cuối: {info?.databaseUpdated ? formatDate(info.databaseUpdated) : "—"}
-          </p>
-          <Button
-            className="mt-3 h-8 px-3"
-            icon={<RefreshCw size={14} className={updating ? "animate-spin" : ""} />}
-            onClick={() => void update()}
-            disabled={!info?.freshclam || updating}
-          >
-            {updating ? "Đang cập nhật…" : "Cập nhật"}
-          </Button>
-        </div>
-      </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <span className="mr-2 text-sm text-slate-500">Phạm vi quét:</span>
@@ -253,48 +154,12 @@ export function AntivirusPage() {
             }
           />
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th className="w-12">
-                  <SelectAll
-                    ids={threats.map((t) => t.path)}
-                    selected={selection.selected}
-                    onChange={selection.setMany}
-                  />
-                </Th>
-                <Th>Tệp</Th>
-                <Th className="w-64">Mối đe doạ</Th>
-                <Th className="w-40">Công cụ</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {threats.map((threat) => (
-                <tr key={threat.path} className="hover:bg-slate-50">
-                  <Td>
-                    <Checkbox
-                      label={threat.path}
-                      checked={selection.selected.has(threat.path)}
-                      onChange={() => selection.toggle(threat.path)}
-                    />
-                  </Td>
-                  <Td>
-                    <PathCell title={fileName(threat.path)} path={parentDir(threat.path)} />
-                  </Td>
-                  <Td>
-                    <div className="flex flex-wrap gap-1">
-                      {threat.names.map((name) => (
-                        <ThreatBadge key={name}>{name}</ThreatBadge>
-                      ))}
-                    </div>
-                  </Td>
-                  <Td className="text-xs text-slate-600">
-                    {threat.engines.map((e) => ENGINE_LABEL[e]).join(", ")}
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <ThreatTable
+            threats={threats}
+            selected={selection.selected}
+            onToggle={selection.toggle}
+            onSetMany={selection.setMany}
+          />
         )}
       </Panel>
 

@@ -7,15 +7,18 @@ export function ScanProgressPanel({
   tool,
   running,
   root,
+  prefix,
 }: {
   tool: string;
   running: boolean;
   root?: string | null;
+  prefix?: string;
 }) {
   const progress = useScanProgress(tool, running);
   const elapsed = useElapsed(running);
   if (!running) return null;
-  const label = root ? `${stageLabel(progress)}: ${root}` : stageLabel(progress);
+  const stage = root ? `${stageLabel(progress)}: ${root}` : stageLabel(progress);
+  const label = prefix ? `${prefix} · ${stage}` : stage;
   return (
     <ProgressPanel
       label={label}
