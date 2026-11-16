@@ -51,8 +51,18 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           app=$(find src-tauri/target -path "*/bundle/macos/*.app" -maxdepth 5 | head -1)
-          "$app/Contents/Resources/clamav/clamscan" --version
-          "$app/Contents/Resources/clamav/freshclam" --version
+          clam="$app/Contents/Resources/clamav"
+          work="$RUNNER_TEMP/clamav-smoke"
+          mkdir -p "$work/db"
+          printf 'DatabaseDirectory %s\nDatabaseMirror database.clamav.net\n' "$work/db" > "$work/freshclam.conf"
+          "$clam/freshclam" --config-file="$work/freshclam.conf" --version
+          printf 'betaclean-smoke-sample' > "$work/sample.bin"
+          echo "$(md5 -q "$work/sample.bin"):22:Betaclean.Smoke.Sample" > "$work/db/smoke.hdb"
+          set +e
+          "$clam/clamscan" --no-summary --database="$work/db" --cvdcertsdir="$clam/certs" "$work/sample.bin"
+          code=$?
+          set -e
+          test "$code" -eq 1
 
       - name: Smoke test bundled ClamAV (Windows)
         if: runner.os == 'Windows'
