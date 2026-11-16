@@ -1,13 +1,14 @@
 mod features;
 mod shared;
 
-use features::{analyzer, antivirus, cleanup, junk, scan, system, unused};
+use features::{analyzer, antivirus, cleanup, junk, memory, scan, system, unused};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     scan::service::init();
     tauri::Builder::default()
         .manage(scan::state::ScanState::default())
+        .manage(memory::commands::MemoryState::default())
         .invoke_handler(tauri::generate_handler![
             system::commands::get_system_info,
             scan::commands::scan_large_files,
@@ -28,6 +29,8 @@ pub fn run() {
             cleanup::commands::get_cleanup_history,
             analyzer::commands::list_volumes,
             analyzer::commands::analyze_disk,
+            memory::commands::memory_usage,
+            memory::commands::stop_processes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

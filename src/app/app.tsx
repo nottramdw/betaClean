@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { AntivirusPage } from "../features/antivirus/antivirus-page";
 import { HistoryPage } from "../features/history/history-page";
 import { JunkPage } from "../features/junk/junk-page";
+import { MemoryPage } from "../features/memory/memory-page";
 import { OverviewPage } from "../features/overview/overview-page";
 import { QuarantinePage } from "../features/quarantine/quarantine-page";
 import { DuplicatesPage } from "../features/scan/duplicates-page";
@@ -19,6 +20,7 @@ export function App() {
     "large-files": <LargeFilesPage />,
     duplicates: <DuplicatesPage />,
     unused: <UnusedPage />,
+    memory: <MemoryPage active={page === "memory"} />,
     antivirus: <AntivirusPage />,
     quarantine: <QuarantinePage active={page === "quarantine"} />,
     history: <HistoryPage active={page === "history"} />,

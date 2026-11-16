@@ -5,6 +5,7 @@ import {
   FileBox,
   Gauge,
   History,
+  MemoryStick,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
@@ -16,6 +17,7 @@ export type PageId =
   | "large-files"
   | "duplicates"
   | "unused"
+  | "memory"
   | "antivirus"
   | "quarantine"
   | "history";
@@ -26,6 +28,7 @@ export const PAGES: { id: PageId; label: string; icon: LucideIcon }[] = [
   { id: "large-files", label: "Tệp lớn", icon: FileBox },
   { id: "duplicates", label: "Tệp trùng lặp", icon: Copy },
   { id: "unused", label: "Lâu không dùng", icon: Clock },
+  { id: "memory", label: "Bộ nhớ RAM", icon: MemoryStick },
   { id: "antivirus", label: "Quét virus", icon: ShieldCheck },
   { id: "quarantine", label: "Khu cách ly", icon: Archive },
   { id: "history", label: "Lịch sử", icon: History },
