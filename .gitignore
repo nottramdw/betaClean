@@ -3,6 +3,13 @@
 !.env.example
 node_modules/
 dist/
+dist-ssr/
 build/
+*.local
+*.log
+logs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
 .DS_Store
 Thumbs.db
