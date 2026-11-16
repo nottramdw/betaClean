@@ -69,7 +69,12 @@ pub fn locate_defender() -> Option<PathBuf> {
         .filter(|p| p.is_file())
 }
 
+const LAST_CHECK: &str = "last-check";
+
 fn database_updated(db_dir: &Path) -> Option<u64> {
+    let checked = fs::read_to_string(db_dir.join(LAST_CHECK))
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok());
     fs::read_dir(db_dir)
         .ok()?
         .flatten()
@@ -80,7 +85,14 @@ fn database_updated(db_dir: &Path) -> Option<u64> {
         .filter_map(|e| e.metadata().ok()?.modified().ok())
         .filter_map(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs())
+        .chain(checked)
         .max()
+}
+
+fn mark_checked(db_dir: &Path) {
+    if let Ok(now) = std::time::SystemTime::now().duration_since(UNIX_EPOCH) {
+        let _ = fs::write(db_dir.join(LAST_CHECK), now.as_secs().to_string());
+    }
 }
 
 pub fn database_ready(db_dir: &Path) -> bool {
@@ -131,6 +143,7 @@ pub fn update_database(
             output.stdout, output.stderr
         ));
     }
+    mark_checked(db_dir);
     Ok(output.stdout)
 }
 
@@ -288,6 +301,16 @@ mod tests {
         let dir = std::path::Path::new("db");
         assert!(super::freshclam_config(dir, true).contains("TestDatabases no"));
         assert!(!super::freshclam_config(dir, false).contains("TestDatabases"));
+    }
+
+    #[test]
+    fn successful_check_counts_as_fresh_database() {
+        let dir = std::env::temp_dir().join(format!("betaclean-av-check-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(super::database_updated(&dir), None);
+        super::mark_checked(&dir);
+        assert!(super::database_updated(&dir).is_some());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

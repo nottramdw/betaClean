@@ -54,14 +54,13 @@ class Coverage {
   }
 }
 
-function newestPath(group: DuplicateGroup): string {
-  return group.files.reduce((best, f) => (f.modified > best.modified ? f : best), group.files[0])
-    .path;
+function newestPath(files: FileItem[]): string {
+  return files.reduce((best, f) => (f.modified > best.modified ? f : best), files[0]).path;
 }
 
-function duplicateFinding(group: DuplicateGroup): Finding {
-  const keep = newestPath(group);
-  const targets = group.files.map((f) => f.path).filter((p) => p !== keep);
+function duplicateFinding(group: DuplicateGroup, files: FileItem[]): Finding {
+  const keep = newestPath(files);
+  const targets = files.map((f) => f.path).filter((p) => p !== keep);
   return {
     id: `trung-lap:${group.hash}`,
     title: `${fileName(keep)} · ${group.files.length} bản`,
@@ -127,9 +126,10 @@ export function mergeFindings(input: {
 
   input.analyzer.forEach(push);
   for (const group of input.duplicates) {
-    const finding = duplicateFinding(group);
-    const targets = finding.targets.filter((t) => !coverage.has(t));
-    if (targets.length > 0) push({ ...finding, targets, size: group.size * targets.length });
+    const free = group.files.filter((f) => !coverage.has(f.path));
+    if (free.length < 2) continue;
+    const finding = duplicateFinding(group, free);
+    push({ ...finding, size: group.size * finding.targets.length });
   }
   input.unused.filter((f) => !coverage.has(f.path)).forEach((f) => push(unusedFinding(f)));
   input.large.filter((f) => !coverage.has(f.path)).forEach((f) => push(largeFinding(f)));

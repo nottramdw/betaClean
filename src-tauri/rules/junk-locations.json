@@ -123,7 +123,7 @@
     "label": "Thùng rác",
     "os": "macos",
     "path": "{home}/.Trash",
-    "safety": "can-xem-xet"
+    "safety": "chi-thong-bao"
   },
   {
     "id": "mac-npm-cache",

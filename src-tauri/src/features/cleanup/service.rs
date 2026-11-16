@@ -33,11 +33,25 @@ fn size_of(path: &Path) -> u64 {
     }
 }
 
+fn trash_context() -> trash::TrashContext {
+    #[allow(unused_mut)]
+    let mut context = trash::TrashContext::default();
+    #[cfg(target_os = "macos")]
+    {
+        use trash::macos::{DeleteMethod, TrashContextExtMacos};
+        context.set_delete_method(DeleteMethod::NsFileManager);
+    }
+    context
+}
+
 fn move_file(from: &Path, to: &Path) -> std::io::Result<()> {
     if fs::rename(from, to).is_ok() {
         return Ok(());
     }
-    fs::copy(from, to)?;
+    if let Err(e) = fs::copy(from, to) {
+        let _ = fs::remove_file(to);
+        return Err(e);
+    }
     if let Err(e) = fs::remove_file(from) {
         let _ = fs::remove_file(to);
         return Err(e);
@@ -69,10 +83,20 @@ impl Store {
     }
 
     pub fn list_quarantine(&self) -> Vec<QuarantineEntry> {
-        fs::read_to_string(self.quarantine_dir().join(INDEX_FILE))
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default()
+        self.load_quarantine().unwrap_or_default()
+    }
+
+    fn load_quarantine(&self) -> Result<Vec<QuarantineEntry>, String> {
+        let index = self.quarantine_dir().join(INDEX_FILE);
+        let text = match fs::read_to_string(&index) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(format!("Không đọc được chỉ mục cách ly: {e}")),
+        };
+        serde_json::from_str(&text).map_err(|e| {
+            let _ = fs::copy(&index, index.with_extension(format!("json.bad-{}", now())));
+            format!("Chỉ mục cách ly bị hỏng, đã sao lưu và dừng thao tác: {e}")
+        })
     }
 
     fn save_quarantine(&self, entries: &[QuarantineEntry]) -> Result<(), String> {
@@ -156,7 +180,7 @@ impl Store {
                 if fs::symlink_metadata(path).is_err() {
                     return Err("Không tìm thấy đường dẫn.".to_string());
                 }
-                trash::delete(path).map_err(|e| e.to_string())
+                trash_context().delete(path).map_err(|e| e.to_string())
             });
             self.finish(&mut report, Action::Trash, target, size, outcome);
         }
@@ -174,7 +198,7 @@ impl Store {
         }
         let _lock = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         fs::create_dir_all(self.quarantine_dir()).map_err(|e| e.to_string())?;
-        let mut entries = self.list_quarantine();
+        let mut entries = self.load_quarantine()?;
         let mut report = CleanupReport::default();
         for item in items {
             let path = Path::new(&item.path);
@@ -186,16 +210,25 @@ impl Store {
                 }
                 move_file(path, &self.stored_file(&id)).map_err(|e| e.to_string())
             });
-            if outcome.is_ok() {
+            let outcome = outcome.and_then(|()| {
                 entries.push(QuarantineEntry {
-                    id,
+                    id: id.clone(),
                     original_path: item.path.clone(),
                     reason: item.reason.clone(),
                     size,
                     quarantined_at: now(),
                 });
-                self.save_quarantine(&entries)?;
-            }
+                self.save_quarantine(&entries).map_err(|e| {
+                    entries.pop();
+                    match move_file(&self.stored_file(&id), path) {
+                        Ok(()) => format!("Không ghi được chỉ mục cách ly, đã hoàn tác: {e}"),
+                        Err(back) => format!(
+                            "Không ghi được chỉ mục cách ly ({e}); tệp nằm tại {}: {back}",
+                            self.stored_file(&id).display()
+                        ),
+                    }
+                })
+            });
             self.finish(&mut report, Action::Quarantine, &item.path, size, outcome);
         }
         Ok(report)
@@ -206,7 +239,7 @@ impl Store {
             return Err(NOT_CONFIRMED.to_string());
         }
         let _lock = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let mut entries = self.list_quarantine();
+        let mut entries = self.load_quarantine()?;
         let mut report = CleanupReport::default();
         for id in ids {
             let Some(index) = entries.iter().position(|e| &e.id == id) else {
@@ -254,7 +287,7 @@ impl Store {
             return Err(NOT_CONFIRMED.to_string());
         }
         let _lock = LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let mut entries = self.list_quarantine();
+        let mut entries = self.load_quarantine()?;
         let mut report = CleanupReport::default();
         for id in ids {
             let Some(index) = entries.iter().position(|e| &e.id == id) else {

@@ -39,7 +39,7 @@ export async function scanWithFreshDatabase(paths: string[]): Promise<VirusScanR
       `Chưa có cơ sở dữ liệu virus nên không thể quét. ${notes.join(" ")} Kiểm tra kết nối mạng rồi thử lại.`,
     );
   }
-  const result = await scanViruses(paths);
+  const result = await scanViruses(paths, ready ? undefined : ["defender"]);
   return { ...result, errors: [...notes, ...result.errors] };
 }
 

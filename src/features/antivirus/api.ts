@@ -32,6 +32,6 @@ export function updateVirusDatabase(): Promise<string> {
   return invoke("update_virus_database");
 }
 
-export function scanViruses(paths: string[]): Promise<VirusScanResult> {
-  return invoke("scan_viruses", { options: { paths } });
+export function scanViruses(paths: string[], engines?: Engine[]): Promise<VirusScanResult> {
+  return invoke("scan_viruses", { options: { paths, engines } });
 }

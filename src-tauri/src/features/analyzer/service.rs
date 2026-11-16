@@ -254,7 +254,17 @@ pub fn analyze(
     }
 
     let unused_days = options.unused_days.unwrap_or(DEFAULT_UNUSED_DAYS);
-    findings.extend(walk_findings(&walk, &rules, &extensions, unused_days, at));
+    let location_paths: Vec<PathBuf> = findings.iter().map(|f| PathBuf::from(&f.path)).collect();
+    findings.extend(
+        walk_findings(&walk, &rules, &extensions, unused_days, at)
+            .into_iter()
+            .filter(|f| {
+                f.category != Category::LauKhongDung
+                    || !location_paths
+                        .iter()
+                        .any(|l| Path::new(&f.path).starts_with(l))
+            }),
+    );
     rank(&mut findings);
 
     let mut hotspots: Vec<Hotspot> = totals

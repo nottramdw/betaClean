@@ -94,6 +94,14 @@ impl Guard {
         if !path.is_absolute() {
             return Err("Đường dẫn không tuyệt đối.".to_string());
         }
+        if path.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir | std::path::Component::CurDir
+            )
+        }) {
+            return Err("Đường dẫn chứa thành phần tương đối.".to_string());
+        }
         if path.parent().is_none() || path.parent().is_some_and(|p| p.as_os_str().is_empty()) {
             return Err("Không được xoá thư mục gốc.".to_string());
         }
@@ -152,6 +160,8 @@ mod tests {
         assert!(g.check(&r.join("Windows").join("System32")).is_err());
         assert!(g.check(&r.join("Windows")).is_err());
         assert!(g.check(Path::new("tuong-doi")).is_err());
+        let escape = r.join("Windows").join("Temp").join("..").join("System32");
+        assert!(g.check(&escape).is_err());
     }
 
     #[test]
