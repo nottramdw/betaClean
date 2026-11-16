@@ -9,6 +9,7 @@ use czkawka_core::common::model::CheckingMethod;
 use czkawka_core::common::progress_data::{ProgressData, ToolStage};
 
 use super::model::{TimeBasis, UnusedFile, UnusedOptions};
+use crate::shared::disk_size;
 
 pub const DEFAULT_DAYS: u64 = 180;
 pub const DEFAULT_MIN_SIZE: u64 = 1024 * 1024;
@@ -133,7 +134,8 @@ pub fn find_unused(
                 let Ok(meta) = entry.metadata() else {
                     continue;
                 };
-                if meta.len() < min_size {
+                let size = disk_size::on_disk(&path, &meta);
+                if size < min_size {
                     continue;
                 }
                 let (used, basis) = last_used(&meta);
@@ -142,7 +144,7 @@ pub fn find_unused(
                 }
                 found.push(UnusedFile {
                     path: path.to_string_lossy().into_owned(),
-                    size: meta.len(),
+                    size,
                     last_used: used,
                     idle_days: (current - used) / DAY,
                     basis,

@@ -25,14 +25,19 @@ function stale(status: AntivirusStatus): boolean {
 export async function scanWithFreshDatabase(paths: string[]): Promise<VirusScanResult> {
   const status = await antivirusStatus();
   const notes: string[] = [];
+  let ready = status.databaseReady;
   if (status.clamscan && status.freshclam && stale(status)) {
     try {
       await updateVirusDatabase();
-    } catch {
-      if (!status.databaseReady) {
-        notes.push("Không tải được cơ sở dữ liệu ClamAV (cần kết nối mạng lần đầu).");
-      }
+      ready = true;
+    } catch (error) {
+      notes.push(`Không cập nhật được cơ sở dữ liệu ClamAV: ${String(error)}`);
     }
+  }
+  if (!ready && !status.defender) {
+    throw new Error(
+      `Chưa có cơ sở dữ liệu virus nên không thể quét. ${notes.join(" ")} Kiểm tra kết nối mạng rồi thử lại.`,
+    );
   }
   const result = await scanViruses(paths);
   return { ...result, errors: [...notes, ...result.errors] };

@@ -10,6 +10,7 @@ use super::model::{
 };
 use crate::features::junk::service::dir_usage;
 use crate::features::unused::service::now;
+use crate::shared::disk_size;
 
 const QUARANTINE_DIR: &str = "quarantine";
 const INDEX_FILE: &str = "index.json";
@@ -27,7 +28,7 @@ pub struct Store {
 fn size_of(path: &Path) -> u64 {
     match fs::symlink_metadata(path) {
         Ok(meta) if meta.is_dir() => dir_usage(path, &AtomicBool::new(false)).0,
-        Ok(meta) => meta.len(),
+        Ok(meta) => disk_size::on_disk(path, &meta),
         Err(_) => 0,
     }
 }

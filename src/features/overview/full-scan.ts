@@ -41,6 +41,7 @@ class Coverage {
   private folders: string[] = [];
 
   add(finding: Finding) {
+    this.targets.add(normalize(finding.path));
     for (const target of finding.targets) this.targets.add(normalize(target));
     if (FOLDER_CATEGORIES.has(finding.category)) {
       this.folders.push(`${normalize(finding.path).replace(/\/$/, "")}/`);

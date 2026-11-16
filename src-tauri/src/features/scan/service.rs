@@ -15,6 +15,7 @@ use czkawka_core::tools::empty_folder::EmptyFolder;
 use czkawka_core::tools::temporary::{Temporary, TemporaryParameters};
 
 use super::model::{DuplicateGroup, FileItem, FolderItem, ScanOptions};
+use crate::shared::disk_size;
 
 pub const DEFAULT_LARGE_FILE_LIMIT: usize = 200;
 pub const DEFAULT_DUPLICATE_MIN_SIZE: u64 = 1024;
@@ -70,15 +71,18 @@ pub fn large_files(
     let mut tool = BigFile::new(BigFileParameters::new(limit, SearchMode::BiggestFiles));
     prepare(&mut tool, options)?;
     tool.search(stop, progress);
-    let items = tool
+    let min_size = options.min_size.unwrap_or(0);
+    let mut items: Vec<FileItem> = tool
         .get_big_files()
         .iter()
         .map(|f| FileItem {
             path: path_string(&f.path),
-            size: f.size,
+            size: disk_size::of_path(&f.path).unwrap_or(f.size),
             modified: f.modified_date,
         })
+        .filter(|f| f.size >= min_size)
         .collect();
+    items.sort_by_key(|f| std::cmp::Reverse(f.size));
     finish(&tool, items)
 }
 
@@ -136,7 +140,7 @@ pub fn temporary_files(
         .iter()
         .map(|f| FileItem {
             path: path_string(&f.path),
-            size: f.size,
+            size: disk_size::of_path(&f.path).unwrap_or(f.size),
             modified: f.modified_date,
         })
         .collect();

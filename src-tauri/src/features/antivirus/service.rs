@@ -111,28 +111,38 @@ pub fn update_database(
     let freshclam = locate("freshclam", bundled).ok_or("Không tìm thấy freshclam.")?;
     fs::create_dir_all(db_dir).map_err(|e| e.to_string())?;
     let config = db_dir.join("freshclam.conf");
-    fs::write(
-        &config,
-        format!(
-            "DatabaseDirectory {}\nDatabaseMirror {MIRROR}\n",
-            db_dir.display()
-        ),
-    )
-    .map_err(|e| e.to_string())?;
+    let bundled_certs = certs_dir(&freshclam).is_some();
+    fs::write(&config, freshclam_config(db_dir, bundled_certs)).map_err(|e| e.to_string())?;
     let mut cmd = process::command(&freshclam);
     cmd.arg(format!("--config-file={}", config.display()))
         .arg(format!("--datadir={}", db_dir.display()))
         .arg("--quiet");
     with_certs(&mut cmd, &freshclam);
     let output = process::run(cmd, stop)?;
-    if output.code == 0 {
-        Ok(output.stdout)
-    } else {
-        Err(format!(
+    if output.code != 0 {
+        return Err(format!(
             "freshclam lỗi ({}): {}{}",
             output.code, output.stdout, output.stderr
-        ))
+        ));
     }
+    if !database_ready(db_dir) {
+        return Err(format!(
+            "freshclam kết thúc nhưng CSDL chưa đủ main và daily. {}{}",
+            output.stdout, output.stderr
+        ));
+    }
+    Ok(output.stdout)
+}
+
+pub fn freshclam_config(db_dir: &Path, bundled_certs: bool) -> String {
+    let mut config = format!(
+        "DatabaseDirectory {}\nDatabaseMirror {MIRROR}\n",
+        db_dir.display()
+    );
+    if bundled_certs {
+        config.push_str("TestDatabases no\n");
+    }
+    config
 }
 
 pub fn parse_clamscan(stdout: &str) -> Vec<Threat> {
@@ -273,6 +283,13 @@ pub fn scan(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bundled_engine_skips_freshclam_self_test() {
+        let dir = std::path::Path::new("db");
+        assert!(super::freshclam_config(dir, true).contains("TestDatabases no"));
+        assert!(!super::freshclam_config(dir, false).contains("TestDatabases"));
+    }
+
     #[test]
     fn locked_files_are_not_fatal() {
         let stderr = "LibClamAV Warning: Can't open file C:\\pagefile.sys: 32\nWARNING: Can't open file C:\\pagefile.sys: Invalid argument\n";

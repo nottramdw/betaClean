@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::rules::{ExtensionRule, FolderRule};
 use crate::features::unused::service::last_used;
+use crate::shared::disk_size;
 
 pub const MAX_DEPTH: usize = 8;
 const MIN_EXTENSION_FILE: u64 = 1024 * 1024;
@@ -112,7 +113,7 @@ impl<'a> Walk<'a> {
                 let Ok(meta) = entry.metadata() else {
                     continue;
                 };
-                let size = meta.len();
+                let size = disk_size::on_disk(&path, &meta);
                 let (used, _) = last_used(&meta);
                 total += size;
                 newest = newest.max(used);

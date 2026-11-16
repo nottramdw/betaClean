@@ -1,4 +1,5 @@
 mod features;
+mod shared;
 
 use features::{analyzer, antivirus, cleanup, junk, scan, system, unused};
 

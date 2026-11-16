@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::model::{JunkLocation, JunkRule, Safety};
+use crate::shared::disk_size;
 
 const MAX_TARGETS: usize = 2_000;
 const RULES: &str = include_str!("../../../rules/junk-locations.json");
@@ -76,7 +77,7 @@ pub fn dir_usage(root: &Path, stop: &AtomicBool) -> (u64, u64) {
             if meta.is_dir() {
                 pending.push(entry.path());
             } else if meta.is_file() {
-                size += meta.len();
+                size += disk_size::on_disk(&entry.path(), &meta);
                 count += 1;
             }
         }

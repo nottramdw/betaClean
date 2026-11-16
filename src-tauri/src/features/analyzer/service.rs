@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -13,6 +12,7 @@ use super::walker::{Walk, drill};
 use crate::features::junk::model::{JunkLocation, Safety};
 use crate::features::junk::service as junk;
 use crate::features::unused::service::{now, report};
+use crate::shared::disk_size;
 
 const DAY: u64 = 86_400;
 const DEFAULT_UNUSED_DAYS: u64 = 180;
@@ -91,7 +91,7 @@ fn system_file_findings(rules: &AnalyzerRules) -> Vec<Finding> {
         .filter(|r| r.os == std::env::consts::OS)
         .filter_map(|r| {
             let path = junk::resolve_path(&r.path, junk::system_variable)?;
-            let size = fs::metadata(&path).ok()?.len();
+            let size = disk_size::of_path(&path)?;
             Some(Finding {
                 id: r.id.clone(),
                 title: r.label.clone(),
@@ -303,6 +303,7 @@ pub fn analyze(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn finding(path: &str, size: u64, safety: Safety, category: Category) -> Finding {
         Finding {

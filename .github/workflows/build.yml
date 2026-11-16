@@ -22,6 +22,8 @@ jobs:
             args: "--target universal-apple-darwin"
             rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
     runs-on: ${{ matrix.os }}
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +47,35 @@ jobs:
       - run: cargo test -q
         working-directory: src-tauri
 
-      - run: npm run tauri build -- ${{ matrix.args }}
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain_password=$(openssl rand -base64 24)
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_password" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$keychain_password" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import "$RUNNER_TEMP/cert.p12" -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" build.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Build
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            npm run tauri build -- ${{ matrix.args }} --config "{\"bundle\":{\"macOS\":{\"signingIdentity\":\"$APPLE_SIGNING_IDENTITY\"}}}"
+          else
+            npm run tauri build -- ${{ matrix.args }}
+          fi
 
       - name: Smoke test bundled ClamAV (macOS)
         if: runner.os == 'macOS'

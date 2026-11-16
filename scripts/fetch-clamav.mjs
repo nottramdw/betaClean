@@ -90,8 +90,12 @@ async function prepareMac(work) {
     run("install_name_tool", ["-add_rpath", "@loader_path", file]);
   }
   cpSync(join(programs, "etc", "certs"), join(TARGET, "certs"), { recursive: true });
-  for (const file of [...MAC_PROGRAMS, ...MAC_LIBRARIES]) {
-    run("codesign", ["--force", "--sign", "-", join(TARGET, file)]);
+  const identity = process.env.APPLE_SIGNING_IDENTITY;
+  const sign = identity
+    ? ["--force", "--options", "runtime", "--timestamp", "--sign", identity]
+    : ["--force", "--sign", "-"];
+  for (const file of [...MAC_LIBRARIES, ...MAC_PROGRAMS]) {
+    run("codesign", [...sign, join(TARGET, file)]);
   }
   run(join(TARGET, "clamscan"), ["--version"]);
 }

@@ -58,11 +58,13 @@ pub fn list() -> Vec<Volume> {
                 .map(|e| e.path()),
         );
     }
+    let mut seen = std::collections::HashSet::new();
     mounts
         .into_iter()
         .filter_map(|m| {
             let (total, free) = stat(&m)?;
-            (total > 0).then(|| volume(m.to_string_lossy().into_owned(), total, free))
+            (total > 0 && seen.insert((total, free)))
+                .then(|| volume(m.to_string_lossy().into_owned(), total, free))
         })
         .collect()
 }
