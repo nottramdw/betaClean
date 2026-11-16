@@ -85,11 +85,24 @@ pub fn dir_usage(root: &Path, stop: &AtomicBool) -> (u64, u64) {
     (size, count)
 }
 
+fn removable(entry: &fs::DirEntry) -> bool {
+    if cfg!(target_os = "macos")
+        && entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with("com.apple.")
+    {
+        return false;
+    }
+    !entry.file_type().is_ok_and(|t| t.is_dir()) || fs::read_dir(entry.path()).is_ok()
+}
+
 pub fn children(dir: &Path) -> Vec<String> {
     fs::read_dir(dir)
         .map(|entries| {
             entries
                 .flatten()
+                .filter(removable)
                 .take(MAX_TARGETS)
                 .map(|e| e.path().to_string_lossy().into_owned())
                 .collect()

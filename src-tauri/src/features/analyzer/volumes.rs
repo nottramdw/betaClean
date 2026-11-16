@@ -36,7 +36,7 @@ pub fn list() -> Vec<Volume> {
 }
 
 #[cfg(unix)]
-fn stat(path: &std::path::Path) -> Option<(u64, u64)> {
+fn stat(path: &std::path::Path) -> Option<(u64, u64, bool)> {
     use std::os::unix::ffi::OsStrExt;
     let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
     let mut info: libc::statvfs = unsafe { std::mem::zeroed() };
@@ -44,7 +44,12 @@ fn stat(path: &std::path::Path) -> Option<(u64, u64)> {
         return None;
     }
     let unit = info.f_frsize as u64;
-    Some((info.f_blocks as u64 * unit, info.f_bavail as u64 * unit))
+    let read_only = info.f_flag & libc::ST_RDONLY != 0;
+    Some((
+        info.f_blocks as u64 * unit,
+        info.f_bavail as u64 * unit,
+        read_only,
+    ))
 }
 
 #[cfg(unix)]
@@ -61,9 +66,11 @@ pub fn list() -> Vec<Volume> {
     let mut seen = std::collections::HashSet::new();
     mounts
         .into_iter()
-        .filter_map(|m| {
-            let (total, free) = stat(&m)?;
-            (total > 0 && seen.insert((total, free)))
+        .enumerate()
+        .filter_map(|(index, m)| {
+            let (total, free, read_only) = stat(&m)?;
+            let external_image = index > 0 && read_only;
+            (total > 0 && !external_image && seen.insert((total, free)))
                 .then(|| volume(m.to_string_lossy().into_owned(), total, free))
         })
         .collect()
