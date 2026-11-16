@@ -1,6 +1,6 @@
 mod features;
 
-use features::{antivirus, cleanup, junk, scan, system, unused};
+use features::{analyzer, antivirus, cleanup, junk, scan, system, unused};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +25,8 @@ pub fn run() {
             cleanup::commands::restore_quarantined,
             cleanup::commands::delete_quarantined,
             cleanup::commands::get_cleanup_history,
+            analyzer::commands::list_volumes,
+            analyzer::commands::analyze_disk,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

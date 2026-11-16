@@ -291,11 +291,13 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
  "czkawka_core",
+ "libc",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "trash",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

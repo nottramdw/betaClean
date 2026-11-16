@@ -1,0 +1,107 @@
+{
+  "files": [
+    {
+      "id": "win-hiberfil",
+      "label": "Tệp ngủ đông hiberfil.sys",
+      "os": "windows",
+      "path": "{systemdrive}/hiberfil.sys",
+      "safety": "chi-thong-bao",
+      "reason": "Windows dùng tệp này cho chế độ ngủ đông và khởi động nhanh.",
+      "action": "Nếu không dùng ngủ đông, chạy với quyền quản trị: powercfg /hibernate off."
+    },
+    {
+      "id": "win-pagefile",
+      "label": "Tệp bộ nhớ ảo pagefile.sys",
+      "os": "windows",
+      "path": "{systemdrive}/pagefile.sys",
+      "safety": "chi-thong-bao",
+      "reason": "Bộ nhớ ảo do Windows quản lý, không được xoá tay.",
+      "action": "Điều chỉnh kích thước tại System Properties > Advanced > Performance > Virtual memory."
+    },
+    {
+      "id": "win-swapfile",
+      "label": "Tệp hoán đổi swapfile.sys",
+      "os": "windows",
+      "path": "{systemdrive}/swapfile.sys",
+      "safety": "chi-thong-bao",
+      "reason": "Windows dùng cho ứng dụng hiện đại, không được xoá tay.",
+      "action": "Để Windows tự quản lý."
+    },
+    {
+      "id": "win-memory-dump",
+      "label": "Tệp kết xuất bộ nhớ MEMORY.DMP",
+      "os": "windows",
+      "path": "{windir}/MEMORY.DMP",
+      "safety": "chi-thong-bao",
+      "reason": "Kết xuất sau lỗi màn hình xanh, chỉ cần khi chẩn đoán lỗi.",
+      "action": "Xoá bằng Disk Cleanup (System error memory dump files)."
+    },
+    {
+      "id": "mac-docker-raw",
+      "label": "Ổ ảo Docker Desktop",
+      "os": "macos",
+      "path": "{home}/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+      "safety": "chi-thong-bao",
+      "reason": "Chứa image và container của Docker; xoá tay làm mất dữ liệu Docker.",
+      "action": "Chạy docker system prune hoặc giảm Disk image size trong Docker Desktop."
+    }
+  ],
+  "folders": [
+    {
+      "id": "dev-node-modules",
+      "label": "Thư viện npm (node_modules)",
+      "name": "node_modules",
+      "parentMarker": "package.json",
+      "safety": "can-xem-xet",
+      "reason": "Tải lại được bằng npm install.",
+      "action": "Chuyển Thùng rác nếu dự án ít dùng."
+    },
+    {
+      "id": "dev-rust-target",
+      "label": "Sản phẩm biên dịch Rust",
+      "name": "target",
+      "parentMarker": "Cargo.toml",
+      "safety": "an-toan",
+      "reason": "Sinh lại được bằng cargo build.",
+      "action": "Chuyển Thùng rác hoặc chạy cargo clean."
+    },
+    {
+      "id": "dev-python-venv",
+      "label": "Môi trường ảo Python",
+      "name": ".venv",
+      "selfMarker": "pyvenv.cfg",
+      "safety": "can-xem-xet",
+      "reason": "Tạo lại được từ requirements hoặc pyproject.",
+      "action": "Chuyển Thùng rác nếu dự án ít dùng."
+    },
+    {
+      "id": "dev-pycache",
+      "label": "Bộ đệm Python (__pycache__)",
+      "name": "__pycache__",
+      "safety": "an-toan",
+      "reason": "Python tự sinh lại khi chạy.",
+      "action": "Chuyển Thùng rác."
+    },
+    {
+      "id": "dev-gradle",
+      "label": "Bộ đệm Gradle của dự án",
+      "name": ".gradle",
+      "parentMarker": "settings.gradle",
+      "safety": "an-toan",
+      "reason": "Gradle tự sinh lại khi build.",
+      "action": "Chuyển Thùng rác."
+    }
+  ],
+  "extensions": [
+    {
+      "id": "old-installers",
+      "label": "Bộ cài và tệp nén cũ trong Downloads",
+      "under": "{home}/Downloads",
+      "extensions": ["exe", "msi", "dmg", "pkg", "zip", "rar", "7z", "iso"],
+      "minIdleDays": 30,
+      "safety": "can-xem-xet",
+      "reason": "Bộ cài đã dùng xong thường không cần giữ; tải lại được khi cần.",
+      "action": "Xem lại rồi chuyển Thùng rác."
+    }
+  ]
+}

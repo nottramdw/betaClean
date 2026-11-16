@@ -64,7 +64,7 @@ fn recently_used(_root: &Path, _days: u64) -> HashSet<PathBuf> {
     HashSet::new()
 }
 
-fn report(progress: Option<&Sender<ProgressData>>, checked: usize) {
+pub fn report(progress: Option<&Sender<ProgressData>>, checked: usize) {
     if let Some(sender) = progress {
         let _ = sender.send(ProgressData {
             stage: ToolStage::CollectingFiles(CheckingMethod::None),
