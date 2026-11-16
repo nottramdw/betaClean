@@ -1,0 +1,85 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: ""
+            rust-targets: ""
+          - os: macos-latest
+            args: "--target universal-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: cargo test -q
+        working-directory: src-tauri
+
+      - run: npm run tauri build -- ${{ matrix.args }}
+
+      - name: Smoke test bundled ClamAV (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          app=$(find src-tauri/target -path "*/bundle/macos/*.app" -maxdepth 5 | head -1)
+          "$app/Contents/Resources/clamav/clamscan" --version
+          "$app/Contents/Resources/clamav/freshclam" --version
+
+      - name: Smoke test bundled ClamAV (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & src-tauri/resources/clamav/clamscan.exe --version
+          & src-tauri/resources/clamav/freshclam.exe --version
+          $msi = Get-ChildItem src-tauri/target/release/bundle/msi/*.msi | Select-Object -First 1
+          $out = Join-Path $env:RUNNER_TEMP "msi"
+          Start-Process msiexec -ArgumentList "/a `"$($msi.FullName)`" /qn TARGETDIR=`"$out`"" -Wait
+          $scan = Get-ChildItem $out -Recurse -Filter clamscan.exe | Select-Object -First 1
+          if (-not $scan) { throw "clamscan.exe không có trong bản cài" }
+          & $scan.FullName --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: betaclean-${{ runner.os }}
+          path: |
+            src-tauri/target/**/bundle/dmg/*.dmg
+            src-tauri/target/**/bundle/nsis/*.exe
+            src-tauri/target/**/bundle/msi/*.msi
+          if-no-files-found: error
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            src-tauri/target/**/bundle/dmg/*.dmg
+            src-tauri/target/**/bundle/nsis/*.exe
+            src-tauri/target/**/bundle/msi/*.msi

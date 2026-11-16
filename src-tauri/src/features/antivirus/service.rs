@@ -42,6 +42,19 @@ pub fn locate(name: &str, bundled: Option<&Path>) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
+pub fn certs_dir(executable: &Path) -> Option<PathBuf> {
+    executable
+        .parent()
+        .map(|dir| dir.join("certs"))
+        .filter(|dir| dir.is_dir())
+}
+
+fn with_certs(cmd: &mut std::process::Command, executable: &Path) {
+    if let Some(dir) = certs_dir(executable) {
+        cmd.arg(format!("--cvdcertsdir={}", dir.display()));
+    }
+}
+
 pub fn locate_defender() -> Option<PathBuf> {
     if !cfg!(windows) {
         return None;
@@ -110,6 +123,7 @@ pub fn update_database(
     cmd.arg(format!("--config-file={}", config.display()))
         .arg(format!("--datadir={}", db_dir.display()))
         .arg("--quiet");
+    with_certs(&mut cmd, &freshclam);
     let output = process::run(cmd, stop)?;
     if output.code == 0 {
         Ok(output.stdout)
@@ -170,8 +184,9 @@ fn scan_clamav(
     }
     let mut cmd = process::command(clamscan);
     cmd.args(["-r", "--infected", "--no-summary", "--stdout"])
-        .arg(format!("--database={}", db_dir.display()))
-        .args(paths);
+        .arg(format!("--database={}", db_dir.display()));
+    with_certs(&mut cmd, clamscan);
+    cmd.args(paths);
     let output = process::run(cmd, stop)?;
     let threats = parse_clamscan(&output.stdout);
     match output.code {

@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 import {
+  chmodSync,
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -14,52 +16,102 @@ import { join, resolve } from "node:path";
 const VERSION = "1.5.4";
 const ROOT = resolve(import.meta.dirname, "..");
 const TARGET = join(ROOT, "src-tauri", "resources", "clamav");
-const KEEP_FILES = /^(clamscan\.exe|freshclam\.exe|.+\.dll|COPYING\.txt|README\.md)$/i;
-const KEEP_DIRS = ["certs", "COPYING"];
+const RELEASE = `https://github.com/Cisco-Talos/clamav/releases/download/clamav-${VERSION}`;
+const MARKER = process.platform === "win32" ? "clamscan.exe" : "clamscan";
 
-function placeholder() {
-  mkdirSync(TARGET, { recursive: true });
-  writeFileSync(join(TARGET, ".keep"), "");
-}
+const WINDOWS_FILES = /^(clamscan\.exe|freshclam\.exe|.+\.dll|COPYING\.txt|README\.md)$/i;
+const WINDOWS_DIRS = ["certs", "COPYING"];
+const MAC_PROGRAMS = ["clamscan", "freshclam"];
+const MAC_LIBRARIES = [
+  "libclamav.12.dylib",
+  "libclammspack.0.dylib",
+  "libfreshclam.4.dylib",
+  "libclamunrar.12.dylib",
+  "libclamunrar_iface.12.dylib",
+];
 
-if (process.platform !== "win32") {
-  placeholder();
-  console.log("Bỏ qua: ClamAV chỉ được đóng gói sẵn cho Windows. macOS dùng bản cài qua Homebrew.");
-  process.exit(0);
-}
-
-if (existsSync(join(TARGET, "clamscan.exe")) && !process.argv.includes("--force")) {
-  console.log(`ClamAV đã có tại ${TARGET}`);
-  process.exit(0);
-}
-
-const work = mkdtempSync(join(tmpdir(), "betaclean-clamav-"));
-const name = `clamav-${VERSION}.win.x64`;
-const url = `https://github.com/Cisco-Talos/clamav/releases/download/clamav-${VERSION}/${name}.zip`;
-const archive = join(work, `${name}.zip`);
-
-try {
+async function download(url, file) {
   console.log(`Tải ${url}`);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Tải thất bại: HTTP ${response.status}`);
-  writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
+  writeFileSync(file, Buffer.from(await response.arrayBuffer()));
+}
 
+function run(command, args) {
+  execFileSync(command, args, { stdio: "inherit" });
+}
+
+async function prepareWindows(work) {
+  const name = `clamav-${VERSION}.win.x64`;
+  const archive = join(work, `${name}.zip`);
+  await download(`${RELEASE}/${name}.zip`, archive);
   const extracted = join(work, "out");
   mkdirSync(extracted);
-  execFileSync(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), [
+  run(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), [
     "-xf",
     archive,
     "-C",
     extracted,
   ]);
   const source = join(extracted, name);
-
-  rmSync(TARGET, { recursive: true, force: true });
-  mkdirSync(TARGET, { recursive: true });
   for (const entry of readdirSync(source, { withFileTypes: true })) {
-    const keep = entry.isDirectory() ? KEEP_DIRS.includes(entry.name) : KEEP_FILES.test(entry.name);
+    const keep = entry.isDirectory()
+      ? WINDOWS_DIRS.includes(entry.name)
+      : WINDOWS_FILES.test(entry.name);
     if (keep) cpSync(join(source, entry.name), join(TARGET, entry.name), { recursive: true });
   }
+}
+
+function findPayload(expanded, component) {
+  const dir = readdirSync(expanded).find((name) => name.includes(component));
+  if (!dir) throw new Error(`Không thấy gói ${component} trong pkg`);
+  return join(expanded, dir, "Payload", "usr", "local", "clamav");
+}
+
+async function prepareMac(work) {
+  const name = `clamav-${VERSION}.macos.universal`;
+  const archive = join(work, `${name}.pkg`);
+  await download(`${RELEASE}/${name}.pkg`, archive);
+  const expanded = join(work, "expanded");
+  run("pkgutil", ["--expand-full", archive, expanded]);
+  const programs = findPayload(expanded, "programs");
+  const libraries = findPayload(expanded, "libraries");
+
+  for (const program of MAC_PROGRAMS) {
+    const file = join(TARGET, program);
+    copyFileSync(join(programs, "bin", program), file);
+    chmodSync(file, 0o755);
+    run("install_name_tool", ["-add_rpath", "@executable_path", file]);
+  }
+  for (const library of MAC_LIBRARIES) {
+    const file = join(TARGET, library);
+    copyFileSync(join(libraries, "lib", library), file);
+    chmodSync(file, 0o644);
+    run("install_name_tool", ["-add_rpath", "@loader_path", file]);
+  }
+  cpSync(join(programs, "etc", "certs"), join(TARGET, "certs"), { recursive: true });
+  for (const file of [...MAC_PROGRAMS, ...MAC_LIBRARIES]) {
+    run("codesign", ["--force", "--sign", "-", join(TARGET, file)]);
+  }
+  run(join(TARGET, "clamscan"), ["--version"]);
+}
+
+if (!["win32", "darwin"].includes(process.platform)) {
+  console.log("Bỏ qua: chỉ đóng gói ClamAV cho Windows và macOS.");
+  process.exit(0);
+}
+
+if (existsSync(join(TARGET, MARKER)) && !process.argv.includes("--force")) {
+  console.log(`ClamAV đã có tại ${TARGET}`);
+  process.exit(0);
+}
+
+const work = mkdtempSync(join(tmpdir(), "betaclean-clamav-"));
+try {
+  rmSync(TARGET, { recursive: true, force: true });
+  mkdirSync(TARGET, { recursive: true });
+  if (process.platform === "win32") await prepareWindows(work);
+  else await prepareMac(work);
   writeFileSync(join(TARGET, ".keep"), "");
   console.log(`Đã chuẩn bị ClamAV ${VERSION} tại ${TARGET}`);
 } finally {
