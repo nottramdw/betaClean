@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { progressPercent } from "../progress-text";
 
 export type ScanProgress = {
   tool: string;
@@ -10,16 +11,47 @@ export type ScanProgress = {
   bytesTotal: number;
 };
 
-export function useScanProgress(tool: string, active: boolean): ScanProgress | null {
-  const [progress, setProgress] = useState<ScanProgress | null>(null);
+export type TrackedProgress = ScanProgress & { remaining: number | null };
+
+type Anchor = { stage: string; at: number; percent: number };
+
+const MIN_SECONDS = 3;
+const MIN_PERCENT = 1;
+
+function estimate(anchor: Anchor, percent: number, now: number): number | null {
+  const seconds = (now - anchor.at) / 1000;
+  const gained = percent - anchor.percent;
+  if (seconds < MIN_SECONDS || gained < MIN_PERCENT || percent >= 100) return null;
+  return (seconds / gained) * (100 - percent);
+}
+
+export function useScanProgress(tool: string, active: boolean): TrackedProgress | null {
+  const [progress, setProgress] = useState<TrackedProgress | null>(null);
+  const anchor = useRef<Anchor | null>(null);
 
   useEffect(() => {
     if (!active) return;
     const unlisten = listen<ScanProgress>("scan-progress", (event) => {
-      if (event.payload.tool === tool) setProgress(event.payload);
+      if (event.payload.tool !== tool) return;
+      const now = Date.now();
+      const percent = progressPercent(event.payload);
+      if (percent === null) {
+        anchor.current = null;
+        setProgress({ ...event.payload, remaining: null });
+        return;
+      }
+      if (
+        !anchor.current ||
+        anchor.current.stage !== event.payload.stage ||
+        percent < anchor.current.percent
+      ) {
+        anchor.current = { stage: event.payload.stage, at: now, percent };
+      }
+      setProgress({ ...event.payload, remaining: estimate(anchor.current, percent, now) });
     });
     return () => {
       void unlisten.then((stop) => stop());
+      anchor.current = null;
       setProgress(null);
     };
   }, [tool, active]);

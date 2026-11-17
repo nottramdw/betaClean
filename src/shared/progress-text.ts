@@ -1,5 +1,5 @@
-import { formatBytes, formatCount } from "./format";
-import type { ScanProgress } from "./hooks/use-scan-progress";
+import { formatBytes, formatCount, formatDuration } from "./format";
+import type { ScanProgress, TrackedProgress } from "./hooks/use-scan-progress";
 
 export function stageLabel(progress: ScanProgress | null): string {
   if (!progress) return "Đang chuẩn bị…";
@@ -18,8 +18,14 @@ export function progressPercent(progress: ScanProgress | null): number | null {
   return null;
 }
 
-export function progressDetail(progress: ScanProgress | null, elapsed: number): string {
-  const time = `${elapsed} giây`;
+function timeText(progress: TrackedProgress | null, elapsed: number): string {
+  const spent = `Đã chạy ${formatDuration(elapsed)}`;
+  if (progress?.remaining == null) return spent;
+  return `${spent} · còn khoảng ${formatDuration(progress.remaining)}`;
+}
+
+export function progressDetail(progress: TrackedProgress | null, elapsed: number): string {
+  const time = timeText(progress, elapsed);
   if (!progress) return time;
   if (progress.bytesTotal > 0) {
     return `${formatBytes(progress.bytesChecked)} / ${formatBytes(progress.bytesTotal)} · ${time}`;

@@ -16,6 +16,16 @@ export function formatCount(value: number): string {
   return value.toLocaleString("vi-VN");
 }
 
+export function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return `${total} giây`;
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (hours > 0) return minutes > 0 ? `${hours} giờ ${minutes} phút` : `${hours} giờ`;
+  const rest = total % 60;
+  return rest > 0 ? `${minutes} phút ${rest} giây` : `${minutes} phút`;
+}
+
 export function formatDate(seconds: number): string {
   if (!seconds) return "—";
   return new Date(seconds * 1000).toLocaleString("vi-VN", {

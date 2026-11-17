@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { quarantineFiles } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
-import { joinPath } from "../../shared/format";
+import { formatDuration, joinPath } from "../../shared/format";
 import { useElapsed } from "../../shared/hooks/use-elapsed";
 import { useHomeDir } from "../../shared/hooks/use-home-dir";
 import { useSelection } from "../../shared/hooks/use-selection";
@@ -119,7 +119,7 @@ export function AntivirusPage() {
       {scan.running && (
         <ProgressPanel
           label="Đang quét virus, quá trình có thể mất vài phút"
-          detail={`${elapsed} giây`}
+          detail={`Đã chạy ${formatDuration(elapsed)}`}
           percent={null}
         />
       )}
