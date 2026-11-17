@@ -1,6 +1,12 @@
 import { fileName, formatCount } from "../../shared/format";
 import { isCleanable, type Safety } from "../../shared/safety";
-import type { DuplicateGroup, FileItem } from "../scan/api";
+import type { DuplicateFile, DuplicateGroup, FileItem } from "../scan/api";
+import {
+  newestFile,
+  reclaimableOf,
+  redundantCopies,
+  storageCount,
+} from "../scan/duplicate-storage";
 import type { UnusedFile } from "../unused/api";
 import type { Finding } from "./api";
 
@@ -53,18 +59,14 @@ class Coverage {
   }
 }
 
-function newestPath(files: FileItem[]): string {
-  return files.reduce((best, f) => (f.modified > best.modified ? f : best), files[0]).path;
-}
-
-function duplicateFinding(group: DuplicateGroup, files: FileItem[]): Finding {
-  const keep = newestPath(files);
-  const targets = files.map((f) => f.path).filter((p) => p !== keep);
+function duplicateFinding(group: DuplicateGroup, files: DuplicateFile[]): Finding {
+  const keep = newestFile(files).path;
+  const targets = redundantCopies(files).map((f) => f.path);
   return {
     id: `trung-lap:${group.hash}`,
     title: `${fileName(keep)} · ${group.files.length} bản`,
     path: keep,
-    size: group.reclaimable,
+    size: reclaimableOf(group.size, files),
     safety: "can-xem-xet",
     category: "trung-lap",
     reason: `${formatCount(group.files.length)} tệp giống hệt nhau.`,
@@ -107,6 +109,10 @@ function largeFinding(file: FileItem): Finding {
   };
 }
 
+export function compareFindings(a: Finding, b: Finding): number {
+  return SAFETY_ORDER[a.safety] - SAFETY_ORDER[b.safety] || b.size - a.size;
+}
+
 export function mergeFindings(input: {
   analyzer: Finding[];
   unused: UnusedFile[];
@@ -126,14 +132,13 @@ export function mergeFindings(input: {
   input.analyzer.forEach(push);
   for (const group of input.duplicates) {
     const free = group.files.filter((f) => !coverage.has(f.path));
-    if (free.length < 2) continue;
-    const finding = duplicateFinding(group, free);
-    push({ ...finding, size: group.size * finding.targets.length });
+    if (storageCount(free) < 2) continue;
+    push(duplicateFinding(group, free));
   }
   input.unused.filter((f) => !coverage.has(f.path)).forEach((f) => push(unusedFinding(f)));
   input.large.filter((f) => !coverage.has(f.path)).forEach((f) => push(largeFinding(f)));
 
-  return merged.sort((a, b) => SAFETY_ORDER[a.safety] - SAFETY_ORDER[b.safety] || b.size - a.size);
+  return merged.sort(compareFindings);
 }
 
 export function reclaimable(findings: Finding[], safety: Safety): number {

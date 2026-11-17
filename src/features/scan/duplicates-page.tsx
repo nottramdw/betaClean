@@ -9,17 +9,18 @@ import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
 import { Button } from "../../shared/ui/button";
 import { EmptyState, Notice, PageHeader, Panel, StatCard } from "../../shared/ui/page";
+import { Badge } from "../../shared/ui/badge";
 import { ScanProgressPanel } from "../../shared/ui/scan-progress-panel";
 import { Checkbox, PathCell } from "../../shared/ui/table";
 import { cancelScan, scanDuplicates, type DuplicateGroup } from "./api";
+import {
+  freedBy,
+  reclaimableOf,
+  redundantCopies,
+  sharesStorage,
+  storageCount,
+} from "./duplicate-storage";
 import { loadScanScope, scopeLabel, type ScanScope } from "./scope";
-
-function newest(group: DuplicateGroup): string {
-  return group.files.reduce(
-    (best, file) => (file.modified > best.modified ? file : best),
-    group.files[0],
-  ).path;
-}
 
 export function DuplicatesPage() {
   const [scope, setScope] = useState<ScanScope | null>(null);
@@ -28,9 +29,9 @@ export function DuplicatesPage() {
   const cleanup = useCleanupAction();
 
   const groups = scan.data ?? [];
-  const sizeOf = new Map(groups.flatMap((g) => g.files.map((f) => [f.path, f.size] as const)));
-  const chosen = [...selection.selected].filter((p) => sizeOf.has(p));
-  const chosenSize = chosen.reduce((sum, p) => sum + (sizeOf.get(p) ?? 0), 0);
+  const known = new Set(groups.flatMap((g) => g.files.map((f) => f.path)));
+  const chosen = [...selection.selected].filter((p) => known.has(p));
+  const chosenSize = groups.reduce((sum, g) => sum + freedBy(g, selection.selected), 0);
   const fullGroups = groups.filter((g) =>
     g.files.every((f) => selection.selected.has(f.path)),
   ).length;
@@ -46,9 +47,7 @@ export function DuplicatesPage() {
   };
 
   const autoSelect = () => {
-    selection.replace(
-      groups.flatMap((g) => g.files.map((f) => f.path).filter((p) => p !== newest(g))),
-    );
+    selection.replace(groups.flatMap((g) => redundantCopies(g.files).map((f) => f.path)));
   };
 
   const trash = () => {
@@ -65,9 +64,9 @@ export function DuplicatesPage() {
             current
               ?.map((g) => {
                 const files = g.files.filter((f) => !done.has(f.path));
-                return { ...g, files, reclaimable: g.size * Math.max(0, files.length - 1) };
+                return { ...g, files, reclaimable: reclaimableOf(g.size, files) };
               })
-              .filter((g) => g.files.length > 1) ?? current,
+              .filter((g) => storageCount(g.files) > 1) ?? current,
         );
         selection.clear();
       },
@@ -162,6 +161,11 @@ export function DuplicatesPage() {
                         target={file.path}
                       />
                     </div>
+                    {sharesStorage(group.files, file) && (
+                      <Badge className="shrink-0 border-sky-200 bg-sky-50 text-info">
+                        Dùng chung dữ liệu
+                      </Badge>
+                    )}
                     <span className="shrink-0 text-xs text-slate-500">
                       {formatDay(file.modified)}
                     </span>

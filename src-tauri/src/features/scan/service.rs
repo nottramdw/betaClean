@@ -14,8 +14,9 @@ use czkawka_core::tools::duplicate::{DuplicateFinder, DuplicateFinderParameters}
 use czkawka_core::tools::empty_folder::EmptyFolder;
 use czkawka_core::tools::temporary::{Temporary, TemporaryParameters};
 
-use super::model::{DuplicateGroup, FileItem, FolderItem, ScanOptions};
+use super::model::{DuplicateFile, DuplicateGroup, FileItem, FolderItem, ScanOptions};
 use crate::shared::disk_size;
+use crate::shared::storage::{self, StorageKey};
 
 pub const DEFAULT_LARGE_FILE_LIMIT: usize = 200;
 pub const DEFAULT_DUPLICATE_MIN_SIZE: u64 = 1024;
@@ -60,6 +61,14 @@ fn finish<T: CommonData, R>(tool: &T, result: R) -> Result<R, String> {
 
 fn path_string(path: &std::path::Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+fn storage_index(keys: &mut Vec<Option<StorageKey>>, key: Option<StorageKey>) -> usize {
+    if let Some(index) = key.and_then(|k| keys.iter().position(|known| *known == Some(k))) {
+        return index;
+    }
+    keys.push(key);
+    keys.len() - 1
 }
 
 pub fn large_files(
@@ -109,18 +118,23 @@ pub fn duplicates(
         .iter()
         .flat_map(|(size, groups)| groups.iter().map(move |group| (*size, group)))
         .filter(|(_, group)| group.len() > 1)
-        .map(|(size, group)| DuplicateGroup {
-            size,
-            hash: group[0].hash.clone(),
-            reclaimable: size * (group.len() as u64 - 1),
-            files: group
+        .filter_map(|(size, group)| {
+            let mut keys: Vec<Option<StorageKey>> = Vec::new();
+            let files: Vec<DuplicateFile> = group
                 .iter()
-                .map(|e| FileItem {
+                .map(|e| DuplicateFile {
                     path: path_string(&e.path),
                     size: e.size,
                     modified: e.modified_date,
+                    storage: storage_index(&mut keys, storage::key(&e.path)),
                 })
-                .collect(),
+                .collect();
+            (keys.len() > 1).then(|| DuplicateGroup {
+                size,
+                hash: group[0].hash.clone(),
+                reclaimable: size * (keys.len() as u64 - 1),
+                files,
+            })
         })
         .collect();
     groups.sort_by_key(|g| std::cmp::Reverse(g.reclaimable));
@@ -234,6 +248,56 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].files.len(), 2);
         assert_eq!(groups[0].reclaimable, 4096);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hard_links_are_not_reclaimable() {
+        let dir = TempDir::new("dup-hard");
+        fs::write(dir.0.join("a.bin"), vec![9u8; 4096]).unwrap();
+        fs::hard_link(dir.0.join("a.bin"), dir.0.join("b.bin")).unwrap();
+        assert!(
+            duplicates(&dir.options(), &flag(), None)
+                .unwrap()
+                .is_empty()
+        );
+        fs::write(dir.0.join("c.bin"), vec![9u8; 4096]).unwrap();
+        let groups = duplicates(&dir.options(), &flag(), None).unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].files.len(), 3);
+        assert_eq!(groups[0].reclaimable, 4096);
+        let shared = |name: &str| {
+            groups[0]
+                .files
+                .iter()
+                .find(|f| f.path.ends_with(name))
+                .unwrap()
+                .storage
+        };
+        assert_eq!(shared("a.bin"), shared("b.bin"));
+        assert_ne!(shared("a.bin"), shared("c.bin"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn apfs_clones_are_not_reclaimable() {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        let dir = TempDir::new("dup-clone");
+        let original = dir.0.join("a.bin");
+        fs::write(&original, vec![4u8; 64 * 1024]).unwrap();
+        let src = CString::new(original.as_os_str().as_bytes()).unwrap();
+        let dst = CString::new(dir.0.join("b.bin").as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::clonefile(src.as_ptr(), dst.as_ptr(), 0) }, 0);
+        assert!(
+            duplicates(&dir.options(), &flag(), None)
+                .unwrap()
+                .is_empty()
+        );
+        fs::write(dir.0.join("c.bin"), vec![4u8; 64 * 1024]).unwrap();
+        let groups = duplicates(&dir.options(), &flag(), None).unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].reclaimable, 64 * 1024);
     }
 
     #[test]

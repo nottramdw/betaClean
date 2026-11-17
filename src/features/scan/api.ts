@@ -10,11 +10,13 @@ export type ScanOptions = {
 
 export type FileItem = { path: string; size: number; modified: number };
 
+export type DuplicateFile = FileItem & { storage: number };
+
 export type DuplicateGroup = {
   size: number;
   hash: string;
   reclaimable: number;
-  files: FileItem[];
+  files: DuplicateFile[];
 };
 
 export function scanLargeFiles(options: ScanOptions): Promise<FileItem[]> {

@@ -27,7 +27,16 @@ pub struct DuplicateGroup {
     pub size: u64,
     pub hash: String,
     pub reclaimable: u64,
-    pub files: Vec<FileItem>,
+    pub files: Vec<DuplicateFile>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateFile {
+    pub path: String,
+    pub size: u64,
+    pub modified: u64,
+    pub storage: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
