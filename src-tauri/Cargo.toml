@@ -1,6 +1,6 @@
 [package]
 name = "betaclean"
-version = "0.2.0"
+version = "0.3.0"
 description = "betaClean"
 authors = ["nottramdw"]
 license = "MIT"
