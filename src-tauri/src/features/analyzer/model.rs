@@ -8,6 +8,8 @@ pub struct AnalyzeOptions {
     #[serde(default)]
     pub paths: Vec<String>,
     #[serde(default)]
+    pub excluded: Vec<String>,
+    #[serde(default)]
     pub unused_days: Option<u64>,
 }
 

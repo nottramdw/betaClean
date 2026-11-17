@@ -45,6 +45,7 @@ pub struct Walk<'a> {
     folders: &'a [FolderRule],
     extensions: &'a [(ExtensionRule, PathBuf)],
     stop: &'a AtomicBool,
+    excluded: Vec<PathBuf>,
     pub children: HashMap<PathBuf, Vec<Node>>,
     pub folder_matches: Vec<FolderMatch>,
     pub extension_matches: Vec<ExtensionMatch>,
@@ -64,6 +65,7 @@ impl<'a> Walk<'a> {
             folders,
             extensions,
             stop,
+            excluded: Vec::new(),
             children: HashMap::new(),
             folder_matches: Vec::new(),
             extension_matches: Vec::new(),
@@ -71,6 +73,11 @@ impl<'a> Walk<'a> {
             files_seen: 0,
             on_progress,
         }
+    }
+
+    pub fn exclude(mut self, paths: Vec<PathBuf>) -> Self {
+        self.excluded = paths;
+        self
     }
 
     pub fn run(&mut self, root: &Path) -> u64 {
@@ -99,6 +106,9 @@ impl<'a> Walk<'a> {
             };
             let path = entry.path();
             if kind.is_dir() {
+                if self.excluded.iter().any(|e| path.starts_with(e)) {
+                    continue;
+                }
                 let (size, used) = self.visit(&path, depth + 1, claimed);
                 total += size;
                 newest = newest.max(used);
@@ -274,5 +284,22 @@ mod tests {
         assert_eq!(total, 130);
         assert_eq!(walk.folder_matches.len(), 1);
         assert_eq!(walk.folder_matches[0].size, 120);
+    }
+
+    #[test]
+    fn walk_skips_excluded_folders() {
+        let base = std::env::temp_dir().join(format!("betaclean-exclude-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let bin = base.join("$RECYCLE.BIN");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("old.bin"), vec![0u8; 50]).unwrap();
+        fs::write(base.join("keep.txt"), vec![0u8; 5]).unwrap();
+        let stop = AtomicBool::new(false);
+        let noop = |_: usize| {};
+        let mut walk = Walk::new(&[], &[], &stop, &noop).exclude(vec![bin]);
+        let total = walk.run(&base);
+        fs::remove_dir_all(&base).unwrap();
+        assert_eq!(total, 5);
+        assert_eq!(walk.files_seen, 1);
     }
 }

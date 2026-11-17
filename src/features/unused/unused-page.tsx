@@ -4,8 +4,8 @@ import { moveToTrash } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
 import { cancelScan } from "../scan/api";
+import { loadScanScope, scopeLabel, type ScanScope } from "../scan/scope";
 import { fileName, formatBytes, formatCount, formatDay, parentDir } from "../../shared/format";
-import { useHomeDir } from "../../shared/hooks/use-home-dir";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
@@ -24,7 +24,7 @@ const DAY_OPTIONS = [
 ];
 
 export function UnusedPage() {
-  const home = useHomeDir();
+  const [scope, setScope] = useState<ScanScope | null>(null);
   const [days, setDays] = useState(180);
   const scan = useTask<UnusedFile[]>();
   const selection = useSelection();
@@ -36,9 +36,12 @@ export function UnusedPage() {
   const total = files.reduce((sum, f) => sum + f.size, 0);
 
   const start = () => {
-    if (!home) return;
     selection.clear();
-    void scan.run(() => scanUnusedFiles({ paths: [home], days }));
+    void scan.run(async () => {
+      const next = await loadScanScope();
+      setScope(next);
+      return scanUnusedFiles({ paths: next.paths, excluded: next.excluded, days });
+    });
   };
 
   const trash = () => {
@@ -58,7 +61,7 @@ export function UnusedPage() {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Lâu không dùng"
         description="Tệp từ 1 MB không được mở trong khoảng thời gian đã chọn. Hãy kiểm tra kỹ trước khi dọn."
@@ -75,7 +78,7 @@ export function UnusedPage() {
                 Dừng
               </Button>
             ) : (
-              <Button variant="primary" icon={<Play size={14} />} onClick={start} disabled={!home}>
+              <Button variant="primary" icon={<Play size={14} />} onClick={start}>
                 Quét
               </Button>
             )}
@@ -85,7 +88,7 @@ export function UnusedPage() {
 
       {cleanup.notice}
       {scan.error && <Notice notice={{ kind: "error", text: scan.error }} />}
-      <ScanProgressPanel tool="unused" running={scan.running} root={home} />
+      <ScanProgressPanel tool="unused" running={scan.running} root={scopeLabel(scope)} />
 
       <Panel
         title={scan.data ? `Kết quả (${formatCount(files.length)} tệp)` : undefined}

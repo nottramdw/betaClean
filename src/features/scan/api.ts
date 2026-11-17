@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { trackScan } from "../../shared/scan-history";
 
 export type ScanOptions = {
   paths: string[];
@@ -17,11 +18,11 @@ export type DuplicateGroup = {
 };
 
 export function scanLargeFiles(options: ScanOptions): Promise<FileItem[]> {
-  return invoke("scan_large_files", { options });
+  return trackScan("large", options.paths, () => invoke("scan_large_files", { options }));
 }
 
 export function scanDuplicates(options: ScanOptions): Promise<DuplicateGroup[]> {
-  return invoke("scan_duplicates", { options });
+  return trackScan("duplicates", options.paths, () => invoke("scan_duplicates", { options }));
 }
 
 export function cancelScan(): Promise<void> {

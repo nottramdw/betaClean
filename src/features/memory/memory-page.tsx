@@ -130,7 +130,7 @@ export function MemoryPage({ active }: { active: boolean }) {
                 <Th className="w-24 text-right">Tiến trình</Th>
                 <Th className="w-20 text-right">CPU</Th>
                 <Th className="w-28 text-right">RAM</Th>
-                <Th className="w-56 text-right">Thao tác</Th>
+                <Th className="w-64 text-right">Thao tác</Th>
               </tr>
             </thead>
             <tbody>

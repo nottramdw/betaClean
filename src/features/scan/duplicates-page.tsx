@@ -1,9 +1,9 @@
 import { Copy, Play, Square, Trash2, Wand2 } from "lucide-react";
+import { useState } from "react";
 import { moveToTrash } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
 import { fileName, formatBytes, formatDay, parentDir } from "../../shared/format";
-import { useHomeDir } from "../../shared/hooks/use-home-dir";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
@@ -12,6 +12,7 @@ import { EmptyState, Notice, PageHeader, Panel, StatCard } from "../../shared/ui
 import { ScanProgressPanel } from "../../shared/ui/scan-progress-panel";
 import { Checkbox, PathCell } from "../../shared/ui/table";
 import { cancelScan, scanDuplicates, type DuplicateGroup } from "./api";
+import { loadScanScope, scopeLabel, type ScanScope } from "./scope";
 
 function newest(group: DuplicateGroup): string {
   return group.files.reduce(
@@ -21,7 +22,7 @@ function newest(group: DuplicateGroup): string {
 }
 
 export function DuplicatesPage() {
-  const home = useHomeDir();
+  const [scope, setScope] = useState<ScanScope | null>(null);
   const scan = useTask<DuplicateGroup[]>();
   const selection = useSelection();
   const cleanup = useCleanupAction();
@@ -36,9 +37,12 @@ export function DuplicatesPage() {
   const reclaimable = groups.reduce((sum, g) => sum + g.reclaimable, 0);
 
   const start = () => {
-    if (!home) return;
     selection.clear();
-    void scan.run(() => scanDuplicates({ paths: [home], minSize: 1024 * 1024 }));
+    void scan.run(async () => {
+      const next = await loadScanScope();
+      setScope(next);
+      return scanDuplicates({ paths: next.paths, excluded: next.excluded, minSize: 1024 * 1024 });
+    });
   };
 
   const autoSelect = () => {
@@ -71,10 +75,10 @@ export function DuplicatesPage() {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Tệp trùng lặp"
-        description="So sánh nội dung tệp (≥ 1 MB) trong thư mục người dùng để tìm các bản sao giống hệt nhau."
+        description="So sánh nội dung tệp (≥ 1 MB) trong thư mục người dùng và các ổ dữ liệu khác để tìm các bản sao giống hệt nhau."
         actions={
           <>
             {groups.length > 0 && !scan.running && (
@@ -87,7 +91,7 @@ export function DuplicatesPage() {
                 Dừng
               </Button>
             ) : (
-              <Button variant="primary" icon={<Play size={14} />} onClick={start} disabled={!home}>
+              <Button variant="primary" icon={<Play size={14} />} onClick={start}>
                 Quét
               </Button>
             )}
@@ -105,7 +109,7 @@ export function DuplicatesPage() {
           }}
         />
       )}
-      <ScanProgressPanel tool="duplicates" running={scan.running} root={home} />
+      <ScanProgressPanel tool="duplicates" running={scan.running} root={scopeLabel(scope)} />
 
       {scan.data && (
         <div className="mb-6 grid grid-cols-1 gap-4 @2xl:grid-cols-3">

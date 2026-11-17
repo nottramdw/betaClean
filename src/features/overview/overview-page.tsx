@@ -71,10 +71,10 @@ export function OverviewPage() {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Tổng quan"
-        description="Quét toàn bộ: tệp rác, tệp lâu không dùng, tệp lớn, tệp trùng lặp. Mục cần xem xét hiển thị trước."
+        description="Quét thư mục người dùng và các ổ dữ liệu khác: tệp rác, tệp lâu không dùng, tệp lớn, tệp trùng lặp. Mục cần xem xét hiển thị trước."
         actions={
           scan.running ? (
             <Button icon={<Square size={14} />} onClick={scan.stop}>
@@ -101,7 +101,7 @@ export function OverviewPage() {
       {volumes.error && <Notice notice={{ kind: "error", text: volumes.error }} />}
 
       <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-4">
-        {shownVolumes.slice(0, 2).map((volume) => (
+        {shownVolumes.map((volume) => (
           <VolumeCard key={volume.mount} volume={volume} />
         ))}
         <StatCard
@@ -122,6 +122,8 @@ export function OverviewPage() {
         <ScanProgressPanel
           tool={step.id}
           running
+          root={step.root}
+          after={step.after}
           prefix={`Bước ${step.index}/${step.total}: ${STEP_LABEL[step.id]}`}
         />
       )}
@@ -131,7 +133,7 @@ export function OverviewPage() {
           <EmptyState
             icon={<Gauge size={22} />}
             title="Chưa quét"
-            hint="Bấm Quét toàn bộ để chạy lần lượt mọi công cụ trên thư mục người dùng. Quá trình có thể mất vài phút đến vài chục phút. Không có tệp nào bị xoá khi chưa xác nhận."
+            hint="Bấm Quét toàn bộ để chạy lần lượt mọi công cụ trên thư mục người dùng và các ổ dữ liệu khác. Quá trình có thể mất vài phút đến vài chục phút. Không có tệp nào bị xoá khi chưa xác nhận."
           />
         </Panel>
       )}

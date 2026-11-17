@@ -5,7 +5,6 @@ import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
 import { formatDuration, joinPath } from "../../shared/format";
 import { useElapsed } from "../../shared/hooks/use-elapsed";
-import { useHomeDir } from "../../shared/hooks/use-home-dir";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
@@ -15,22 +14,26 @@ import { ProgressPanel } from "../../shared/ui/progress-panel";
 import { antivirusStatus, ENGINE_LABEL, type AntivirusStatus, type VirusScanResult } from "./api";
 import { hasEngine, mergeThreats, scanWithFreshDatabase, type MergedThreat } from "./engine";
 import { ThreatTable } from "./threat-table";
+import { useScanScope } from "../scan/scope";
 
-type Scope = "home" | "downloads" | "desktop";
+type Target = { id: string; label: string; path: string };
 
-const SCOPES: { id: Scope; label: string; folder: string | null }[] = [
-  { id: "downloads", label: "Tải về", folder: "Downloads" },
-  { id: "desktop", label: "Màn hình nền", folder: "Desktop" },
-  { id: "home", label: "Toàn bộ thư mục người dùng", folder: null },
-];
+function scanTargets(home: string, drives: string[]): Target[] {
+  return [
+    { id: "downloads", label: "Tải về", path: joinPath(home, "Downloads") },
+    { id: "desktop", label: "Màn hình nền", path: joinPath(home, "Desktop") },
+    { id: "home", label: "Toàn bộ thư mục người dùng", path: home },
+    ...drives.map((drive) => ({ id: drive, label: `Ổ ${drive}`, path: drive })),
+  ];
+}
 
 export function AntivirusPage() {
-  const home = useHomeDir();
+  const scope = useScanScope();
   const status = useTask<AntivirusStatus>();
   const scan = useTask<VirusScanResult>();
   const selection = useSelection();
   const cleanup = useCleanupAction();
-  const [scope, setScope] = useState<Scope>("downloads");
+  const [targetId, setTargetId] = useState("downloads");
   const [threats, setThreats] = useState<MergedThreat[]>([]);
   const elapsed = useElapsed(scan.running);
   const { run: loadStatus } = status;
@@ -40,12 +43,13 @@ export function AntivirusPage() {
   }, [loadStatus]);
 
   const ready = status.data ? hasEngine(status.data) : false;
+  const targets = scope ? scanTargets(scope.home, scope.drives) : [];
   const chosen = threats.filter((t) => selection.selected.has(t.path));
 
   const start = async () => {
-    if (!home) return;
-    const target = SCOPES.find((s) => s.id === scope);
-    const path = target?.folder ? joinPath(home, target.folder) : home;
+    const target = targets.find((t) => t.id === targetId);
+    if (!target) return;
+    const path = target.path;
     selection.clear();
     setThreats([]);
     const result = await scan.run(() => scanWithFreshDatabase([path]));
@@ -74,7 +78,7 @@ export function AntivirusPage() {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Quét virus"
         description="Quét offline trên máy. Cơ sở dữ liệu virus tự cập nhật khi có kết nối mạng."
@@ -83,7 +87,7 @@ export function AntivirusPage() {
             variant="primary"
             icon={<Play size={14} />}
             onClick={() => void start()}
-            disabled={!home || !ready || scan.running}
+            disabled={!scope || !ready || scan.running}
           >
             Quét
           </Button>
@@ -99,14 +103,14 @@ export function AntivirusPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <span className="mr-2 text-sm text-slate-500">Phạm vi quét:</span>
-        {SCOPES.map((item) => (
+        {targets.map((item) => (
           <button
             key={item.id}
             type="button"
             disabled={scan.running}
-            onClick={() => setScope(item.id)}
+            onClick={() => setTargetId(item.id)}
             className={`h-8 rounded-full border px-3 text-sm font-medium transition-colors ${
-              scope === item.id
+              targetId === item.id
                 ? "border-primary bg-primary-soft text-primary"
                 : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
             }`}

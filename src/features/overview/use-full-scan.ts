@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { errorText } from "../../shared/format";
-import { loadHomeDir } from "../../shared/hooks/use-home-dir";
+import { recallSeconds } from "../../shared/scan-history";
 import { cancelScan, scanDuplicates, scanLargeFiles } from "../scan/api";
+import { loadScanScope, scopeLabel } from "../scan/scope";
 import { scanUnusedFiles } from "../unused/api";
 import { analyzeDisk, type AnalysisReport, type Finding } from "./api";
 import { FULL_SCAN, mergeFindings, STEP_LABEL, type StepId } from "./full-scan";
@@ -11,7 +12,13 @@ export type FullScanResult = {
   findings: Finding[];
 };
 
-export type StepState = { id: StepId; index: number; total: number };
+export type StepState = {
+  id: StepId;
+  index: number;
+  total: number;
+  after: number | null;
+  root: string | null;
+};
 
 export function useFullScan() {
   const [result, setResult] = useState<FullScanResult | null>(null);
@@ -25,9 +32,19 @@ export function useFullScan() {
     const issues: string[] = [];
     const steps: StepId[] = ["analyzer", "unused", "large", "duplicates"];
 
+    let paths: string[] = [];
+    let root: string | null = null;
+    const enter = (id: StepId) => {
+      const index = steps.indexOf(id);
+      const later = steps.slice(index + 1).map((next) => recallSeconds(next, paths));
+      const known = later.filter((s): s is number => s !== null);
+      const after = known.length === later.length ? known.reduce((a, b) => a + b, 0) : null;
+      setStep({ id, index: index + 1, total: steps.length, after, root });
+    };
+
     const runStep = async <T>(id: StepId, task: () => Promise<T>, fallback: T): Promise<T> => {
       if (cancelled.current) return fallback;
-      setStep({ id, index: steps.indexOf(id) + 1, total: steps.length });
+      enter(id);
       try {
         return await task();
       } catch (e) {
@@ -37,23 +54,32 @@ export function useFullScan() {
     };
 
     try {
-      const paths = [await loadHomeDir()];
-      setStep({ id: "analyzer", index: 1, total: steps.length });
-      const report = await analyzeDisk();
+      setStep({ id: "analyzer", index: 1, total: steps.length, after: null, root: null });
+      const scope = await loadScanScope();
+      paths = scope.paths;
+      root = scopeLabel(scope);
+      const excluded = scope.excluded;
+      enter("analyzer");
+      const report = await analyzeDisk({ paths, excluded });
       const unused = await runStep(
         "unused",
         () =>
-          scanUnusedFiles({ paths, days: FULL_SCAN.unusedDays, minSize: FULL_SCAN.unusedMinSize }),
+          scanUnusedFiles({
+            paths,
+            excluded,
+            days: FULL_SCAN.unusedDays,
+            minSize: FULL_SCAN.unusedMinSize,
+          }),
         [],
       );
       const large = await runStep(
         "large",
-        () => scanLargeFiles({ paths, minSize: FULL_SCAN.largeMinSize }),
+        () => scanLargeFiles({ paths, excluded, minSize: FULL_SCAN.largeMinSize }),
         [],
       );
       const duplicates = await runStep(
         "duplicates",
-        () => scanDuplicates({ paths, minSize: FULL_SCAN.duplicateMinSize }),
+        () => scanDuplicates({ paths, excluded, minSize: FULL_SCAN.duplicateMinSize }),
         [],
       );
 

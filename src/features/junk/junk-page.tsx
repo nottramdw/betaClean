@@ -54,7 +54,7 @@ export function JunkPage() {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Tệp rác"
         description="Bộ nhớ đệm, tệp tạm và nhật ký ở các vị trí đã biết của hệ điều hành và ứng dụng."

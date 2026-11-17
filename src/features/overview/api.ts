@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { trackScan } from "../../shared/scan-history";
 import type { Safety } from "../../shared/safety";
 
 export type Volume = { mount: string; total: number; free: number; used: number };
@@ -53,6 +54,9 @@ export function listVolumes(): Promise<Volume[]> {
   return invoke("list_volumes");
 }
 
-export function analyzeDisk(): Promise<AnalysisReport> {
-  return invoke("analyze_disk", { options: {} });
+export function analyzeDisk(options: {
+  paths: string[];
+  excluded: string[];
+}): Promise<AnalysisReport> {
+  return trackScan("analyzer", options.paths, () => invoke("analyze_disk", { options }));
 }

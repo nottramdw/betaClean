@@ -38,6 +38,11 @@
 :root {
   --sidebar-w: 232px;
   --content-max: 1600px;
+  --action-bar-h: 0px;
+}
+
+:root:has([data-action-bar]) {
+  --action-bar-h: 4rem;
 }
 
 :root:has([data-rail="true"]) {

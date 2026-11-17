@@ -3,7 +3,6 @@ import { moveToTrash } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
 import { fileName, formatBytes, formatDay, parentDir } from "../../shared/format";
-import { useHomeDir } from "../../shared/hooks/use-home-dir";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
@@ -15,6 +14,7 @@ import { Segmented } from "../../shared/ui/segmented";
 import { Checkbox, PathCell, Table, Td, Th } from "../../shared/ui/table";
 import { useState } from "react";
 import { cancelScan, scanLargeFiles, type FileItem } from "./api";
+import { loadScanScope, scopeLabel, type ScanScope } from "./scope";
 
 const MB = 1024 * 1024;
 const SIZE_OPTIONS = [
@@ -25,7 +25,7 @@ const SIZE_OPTIONS = [
 ];
 
 export function LargeFilesPage() {
-  const home = useHomeDir();
+  const [scope, setScope] = useState<ScanScope | null>(null);
   const [minSize, setMinSize] = useState(100 * MB);
   const scan = useTask<FileItem[]>();
   const selection = useSelection();
@@ -36,9 +36,12 @@ export function LargeFilesPage() {
   const chosenSize = chosen.reduce((sum, f) => sum + f.size, 0);
 
   const start = () => {
-    if (!home) return;
     selection.clear();
-    void scan.run(() => scanLargeFiles({ paths: [home], minSize }));
+    void scan.run(async () => {
+      const next = await loadScanScope();
+      setScope(next);
+      return scanLargeFiles({ paths: next.paths, excluded: next.excluded, minSize });
+    });
   };
 
   const trash = () => {
@@ -58,10 +61,10 @@ export function LargeFilesPage() {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Tệp lớn"
-        description="Tìm các tệp chiếm nhiều dung lượng trong thư mục người dùng."
+        description="Tìm các tệp chiếm nhiều dung lượng trong thư mục người dùng và các ổ dữ liệu khác."
         actions={
           <>
             <Segmented
@@ -75,7 +78,7 @@ export function LargeFilesPage() {
                 Dừng
               </Button>
             ) : (
-              <Button variant="primary" icon={<Play size={14} />} onClick={start} disabled={!home}>
+              <Button variant="primary" icon={<Play size={14} />} onClick={start}>
                 Quét
               </Button>
             )}
@@ -85,7 +88,7 @@ export function LargeFilesPage() {
 
       {cleanup.notice}
       {scan.error && <Notice notice={{ kind: "error", text: scan.error }} />}
-      <ScanProgressPanel tool="large" running={scan.running} root={home} />
+      <ScanProgressPanel tool="large" running={scan.running} root={scopeLabel(scope)} />
 
       <Panel title={scan.data ? `Kết quả (${files.length} tệp)` : undefined}>
         {!scan.data ? (

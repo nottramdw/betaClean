@@ -241,7 +241,8 @@ pub fn analyze(
 
     let extensions = resolved_extensions(&rules);
     let on_progress = |count: usize| report(progress, count);
-    let mut walk = Walk::new(&rules.folders, &extensions, stop, &on_progress);
+    let excluded = options.excluded.iter().map(PathBuf::from).collect();
+    let mut walk = Walk::new(&rules.folders, &extensions, stop, &on_progress).exclude(excluded);
     let mut scanned_bytes = 0u64;
     let mut totals = Vec::new();
     for root in &roots {
@@ -364,7 +365,7 @@ mod tests {
         fs::write(modules.join("lib.js"), vec![0u8; 4096]).unwrap();
         let options = AnalyzeOptions {
             paths: vec![text(&base)],
-            unused_days: None,
+            ..Default::default()
         };
         let result = analyze(&options, &AtomicBool::new(false), None).unwrap();
         fs::remove_dir_all(&base).unwrap();

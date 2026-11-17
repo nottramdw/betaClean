@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { trackScan } from "../../shared/scan-history";
 
 export type UnusedFile = {
   path: string;
@@ -10,8 +11,9 @@ export type UnusedFile = {
 
 export function scanUnusedFiles(options: {
   paths: string[];
+  excluded?: string[];
   days: number;
   minSize?: number;
 }): Promise<UnusedFile[]> {
-  return invoke("scan_unused_files", { options });
+  return trackScan("unused", options.paths, () => invoke("scan_unused_files", { options }));
 }

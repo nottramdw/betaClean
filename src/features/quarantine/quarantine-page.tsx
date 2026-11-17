@@ -61,7 +61,7 @@ export function QuarantinePage({ active }: { active: boolean }) {
   };
 
   return (
-    <div className={chosen.length > 0 ? "pb-20" : ""}>
+    <div>
       <PageHeader
         title="Khu cách ly"
         description="Tệp nghi nhiễm được cô lập tại đây. Có thể khôi phục về vị trí cũ hoặc xoá vĩnh viễn."
