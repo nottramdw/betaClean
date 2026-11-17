@@ -53,24 +53,40 @@ fn stat(path: &std::path::Path) -> Option<(u64, u64, bool)> {
 }
 
 #[cfg(target_os = "macos")]
-fn foreign_format(path: &std::path::Path) -> bool {
+fn mount_info(path: &std::path::Path) -> Option<(Vec<u8>, u32)> {
     use std::os::unix::ffi::OsStrExt;
-    let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
-        return false;
-    };
+    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
     let mut info: libc::statfs = unsafe { std::mem::zeroed() };
     if unsafe { libc::statfs(c_path.as_ptr(), &mut info) } != 0 {
-        return false;
+        return None;
     }
     let name = unsafe { std::ffi::CStr::from_ptr(info.f_fstypename.as_ptr()) };
-    matches!(
-        name.to_bytes(),
-        b"ntfs" | b"msdos" | b"exfat" | b"ufsd_NTFS" | b"tuxera_ntfs"
-    )
+    Some((name.to_bytes().to_vec(), info.f_flags))
+}
+
+#[cfg(target_os = "macos")]
+fn foreign_format(path: &std::path::Path) -> bool {
+    mount_info(path).is_some_and(|(name, _)| {
+        matches!(
+            name.as_slice(),
+            b"ntfs" | b"msdos" | b"exfat" | b"ufsd_NTFS" | b"tuxera_ntfs"
+        )
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn hidden_mount(path: &std::path::Path) -> bool {
+    let flags = (libc::MNT_LOCAL | libc::MNT_DONTBROWSE) as u32;
+    mount_info(path).is_none_or(|(_, f)| f & flags != libc::MNT_LOCAL as u32)
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn foreign_format(_path: &std::path::Path) -> bool {
+    false
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn hidden_mount(_path: &std::path::Path) -> bool {
     false
 }
 
@@ -82,7 +98,9 @@ pub fn list() -> Vec<Volume> {
             entries
                 .flatten()
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-                .map(|e| e.path()),
+                .filter(|e| !e.file_name().as_encoded_bytes().starts_with(b"."))
+                .map(|e| e.path())
+                .filter(|p| !hidden_mount(p)),
         );
     }
     let mut seen = std::collections::HashSet::new();

@@ -14,7 +14,7 @@ import { ProgressPanel } from "../../shared/ui/progress-panel";
 import { antivirusStatus, ENGINE_LABEL, type AntivirusStatus, type VirusScanResult } from "./api";
 import { hasEngine, mergeThreats, scanWithFreshDatabase, type MergedThreat } from "./engine";
 import { ThreatTable } from "./threat-table";
-import { useScanScope } from "../scan/scope";
+import { driveName, useScanScope } from "../scan/scope";
 
 type Target = { id: string; label: string; path: string };
 
@@ -23,7 +23,7 @@ function scanTargets(home: string, drives: string[]): Target[] {
     { id: "downloads", label: "Tải về", path: joinPath(home, "Downloads") },
     { id: "desktop", label: "Màn hình nền", path: joinPath(home, "Desktop") },
     { id: "home", label: "Toàn bộ thư mục người dùng", path: home },
-    ...drives.map((drive) => ({ id: drive, label: `Ổ ${drive}`, path: drive })),
+    ...drives.map((drive) => ({ id: drive, label: `Ổ ${driveName(drive)}`, path: drive })),
   ];
 }
 
