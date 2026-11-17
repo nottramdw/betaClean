@@ -1,13 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { errorText } from "../../shared/format";
 import { loadHomeDir } from "../../shared/hooks/use-home-dir";
-import { antivirusStatus } from "../antivirus/api";
-import {
-  hasEngine,
-  mergeThreats,
-  scanWithFreshDatabase,
-  type MergedThreat,
-} from "../antivirus/engine";
 import { cancelScan, scanDuplicates, scanLargeFiles } from "../scan/api";
 import { scanUnusedFiles } from "../unused/api";
 import { analyzeDisk, type AnalysisReport, type Finding } from "./api";
@@ -16,8 +9,6 @@ import { FULL_SCAN, mergeFindings, STEP_LABEL, type StepId } from "./full-scan";
 export type FullScanResult = {
   report: AnalysisReport;
   findings: Finding[];
-  threats: MergedThreat[];
-  virusSkipped: boolean;
 };
 
 export type StepState = { id: StepId; index: number; total: number };
@@ -32,10 +23,7 @@ export function useFullScan() {
     cancelled.current = false;
     setErrors([]);
     const issues: string[] = [];
-    const status = await antivirusStatus().catch(() => null);
-    const virusReady = status ? hasEngine(status) : false;
     const steps: StepId[] = ["analyzer", "unused", "large", "duplicates"];
-    if (virusReady) steps.push("virus");
 
     const runStep = async <T>(id: StepId, task: () => Promise<T>, fallback: T): Promise<T> => {
       if (cancelled.current) return fallback;
@@ -68,17 +56,11 @@ export function useFullScan() {
         () => scanDuplicates({ paths, minSize: FULL_SCAN.duplicateMinSize }),
         [],
       );
-      const virus = virusReady
-        ? await runStep("virus", () => scanWithFreshDatabase(paths), null)
-        : null;
 
-      if (virus) issues.push(...virus.errors);
       if (cancelled.current) issues.push("Đã dừng quét; kết quả chỉ gồm các bước đã chạy xong.");
       const next = {
         report,
         findings: mergeFindings({ analyzer: report.findings, unused, large, duplicates }),
-        threats: virus ? mergeThreats(virus) : [],
-        virusSkipped: !virusReady,
       };
       setResult(next);
       return next;

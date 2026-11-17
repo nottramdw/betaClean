@@ -13,14 +13,13 @@ export const FULL_SCAN = {
   duplicateMinSize: MB,
 };
 
-export type StepId = "analyzer" | "large" | "unused" | "duplicates" | "virus";
+export type StepId = "analyzer" | "large" | "unused" | "duplicates";
 
 export const STEP_LABEL: Record<StepId, string> = {
   analyzer: "Phân tích dung lượng và tệp rác",
   large: "Tệp lớn",
   unused: "Tệp lâu không dùng",
   duplicates: "Tệp trùng lặp",
-  virus: "Quét virus",
 };
 
 const SAFETY_ORDER: Record<Safety, number> = {

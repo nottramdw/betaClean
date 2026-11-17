@@ -1,17 +1,14 @@
-import { Gauge, Play, ShieldAlert, Square, Trash2 } from "lucide-react";
+import { Gauge, Play, Square, Trash2 } from "lucide-react";
 import { useEffect } from "react";
-import { ThreatTable } from "../antivirus/threat-table";
-import { moveToTrash, quarantineFiles } from "../cleanup/api";
+import { moveToTrash } from "../cleanup/api";
 import { succeededSet } from "../cleanup/summary";
 import { useCleanupAction } from "../cleanup/use-cleanup-action";
 import { formatBytes, formatDate, shortenPath } from "../../shared/format";
-import { useElapsed } from "../../shared/hooks/use-elapsed";
 import { useSelection } from "../../shared/hooks/use-selection";
 import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
 import { Button } from "../../shared/ui/button";
 import { EmptyState, Notice, PageHeader, Panel, StatCard } from "../../shared/ui/page";
-import { ProgressPanel } from "../../shared/ui/progress-panel";
 import { ScanProgressPanel } from "../../shared/ui/scan-progress-panel";
 import { listVolumes, type Volume } from "./api";
 import { FindingsTable } from "./findings-table";
@@ -23,9 +20,7 @@ export function OverviewPage() {
   const volumes = useTask<Volume[]>();
   const scan = useFullScan();
   const selection = useSelection();
-  const threatSelection = useSelection();
   const cleanup = useCleanupAction();
-  const elapsed = useElapsed(scan.running);
   const { run: loadVolumes } = volumes;
 
   useEffect(() => {
@@ -34,23 +29,19 @@ export function OverviewPage() {
 
   const result = scan.result;
   const findings = result?.findings ?? [];
-  const threats = result?.threats ?? [];
   const chosen = findings.filter((f) => selection.selected.has(f.id));
   const chosenSize = chosen.reduce((sum, f) => sum + f.size, 0);
-  const chosenThreats = threats.filter((t) => threatSelection.selected.has(t.path));
   const shownVolumes = result?.report.volumes ?? volumes.data ?? [];
   const step = scan.step;
 
   const start = async () => {
     selection.clear();
-    threatSelection.clear();
     cleanup.setNotice(null);
     const next = await scan.start();
     if (next) {
       selection.replace(
         next.findings.filter((f) => f.safety === "an-toan" && isSelectable(f)).map((f) => f.id),
       );
-      threatSelection.replace(next.threats.map((t) => t.path));
     }
     void loadVolumes(listVolumes);
   };
@@ -79,32 +70,11 @@ export function OverviewPage() {
     });
   };
 
-  const quarantine = () => {
-    const items = chosenThreats.map((t) => ({ path: t.path, reason: t.names.join(", ") }));
-    cleanup.request({
-      title: "Cách ly tệp nhiễm",
-      message: `Di chuyển ${items.length} tệp vào Khu cách ly. Có thể khôi phục khi cần.`,
-      confirmLabel: "Cách ly",
-      danger: true,
-      verb: "Đã cách ly",
-      execute: () => quarantineFiles(items),
-      onDone: (report) => {
-        const done = succeededSet(report);
-        scan.setResult((current) =>
-          current
-            ? { ...current, threats: current.threats.filter((t) => !done.has(t.path)) }
-            : current,
-        );
-        threatSelection.clear();
-      },
-    });
-  };
-
   return (
     <div className={chosen.length > 0 ? "pb-20" : ""}>
       <PageHeader
         title="Tổng quan"
-        description="Quét toàn bộ: tệp rác, tệp lâu không dùng, tệp lớn, tệp trùng lặp và virus. Mục cần xem xét hiển thị trước."
+        description="Quét toàn bộ: tệp rác, tệp lâu không dùng, tệp lớn, tệp trùng lặp. Mục cần xem xét hiển thị trước."
         actions={
           scan.running ? (
             <Button icon={<Square size={14} />} onClick={scan.stop}>
@@ -148,18 +118,11 @@ export function OverviewPage() {
         />
       </div>
 
-      {step && step.id !== "virus" && (
+      {step && (
         <ScanProgressPanel
           tool={step.id}
           running
           prefix={`Bước ${step.index}/${step.total}: ${STEP_LABEL[step.id]}`}
-        />
-      )}
-      {step?.id === "virus" && (
-        <ProgressPanel
-          label={`Bước ${step.index}/${step.total}: ${STEP_LABEL.virus}`}
-          detail={`${elapsed} giây`}
-          percent={null}
         />
       )}
 
@@ -173,37 +136,12 @@ export function OverviewPage() {
         </Panel>
       )}
 
-      {result && threats.length > 0 && (
-        <Panel
-          className="mb-6 border-red-200"
-          title={<span className="text-danger">Mối đe doạ ({threats.length})</span>}
-          aside={
-            <Button
-              variant="danger"
-              className="h-8 px-3"
-              icon={<ShieldAlert size={14} />}
-              disabled={chosenThreats.length === 0}
-              onClick={quarantine}
-            >
-              Cách ly
-            </Button>
-          }
-        >
-          <ThreatTable
-            threats={threats}
-            selected={threatSelection.selected}
-            onToggle={threatSelection.toggle}
-            onSetMany={threatSelection.setMany}
-          />
-        </Panel>
-      )}
-
       {result && (
         <div className="grid grid-cols-12 gap-6">
           <Panel
             className="col-span-12 @5xl:col-span-8 @[100rem]:col-span-9"
             title={`Đề xuất dọn dẹp (${findings.length})`}
-            aside={`${result.virusSkipped ? "Bỏ qua quét virus · " : ""}${formatDate(result.report.generatedAt)}`}
+            aside={formatDate(result.report.generatedAt)}
           >
             {findings.length === 0 ? (
               <EmptyState icon={<Gauge size={22} />} title="Không có đề xuất nào" />
