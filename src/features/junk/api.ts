@@ -14,3 +14,7 @@ export type JunkLocation = {
 export function scanJunkLocations(): Promise<JunkLocation[]> {
   return invoke("scan_junk_locations");
 }
+
+export function measureJunkLocations(ids: string[]): Promise<JunkLocation[]> {
+  return invoke("measure_junk_locations", { ids });
+}

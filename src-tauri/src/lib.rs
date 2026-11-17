@@ -18,6 +18,7 @@ pub fn run() {
             scan::commands::scan_empty_folders,
             scan::commands::cancel_scan,
             junk::commands::scan_junk_locations,
+            junk::commands::measure_junk_locations,
             unused::commands::scan_unused_files,
             antivirus::commands::antivirus_status,
             antivirus::commands::update_virus_database,

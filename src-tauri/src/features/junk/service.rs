@@ -163,6 +163,14 @@ pub fn scan_locations(rules: &[JunkRule], stop: &AtomicBool) -> Result<Vec<JunkL
     Ok(locations)
 }
 
+pub fn measure_locations(ids: &[String], stop: &AtomicBool) -> Result<Vec<JunkLocation>, String> {
+    let rules: Vec<JunkRule> = platform_rules()?
+        .into_iter()
+        .filter(|r| ids.contains(&r.id))
+        .collect();
+    scan_locations(&rules, stop)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,6 +235,32 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(usage, (150, 2));
         assert_eq!(counted, usage);
+    }
+
+    #[test]
+    fn caps_targets_per_location() {
+        let root = std::env::temp_dir().join(format!("betaclean-junk-cap-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        for i in 0..MAX_TARGETS + 5 {
+            fs::write(root.join(format!("f{i}")), b"x").unwrap();
+        }
+        let targets = children(&root);
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(targets.len(), MAX_TARGETS);
+    }
+
+    #[test]
+    fn measures_only_requested_locations() {
+        let rules = platform_rules().unwrap();
+        let ids: Vec<String> = rules.iter().take(2).map(|r| r.id.clone()).collect();
+        let locations = measure_locations(&ids, &AtomicBool::new(false)).unwrap();
+        assert!(locations.iter().all(|l| ids.contains(&l.id)));
+        assert!(
+            measure_locations(&[], &AtomicBool::new(false))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

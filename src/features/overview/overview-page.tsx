@@ -11,9 +11,10 @@ import { Button } from "../../shared/ui/button";
 import { EmptyState, Notice, PageHeader, Panel, StatCard } from "../../shared/ui/page";
 import { CopyPath } from "../../shared/ui/path-actions";
 import { ScanProgressPanel } from "../../shared/ui/scan-progress-panel";
-import { listVolumes, type Volume } from "./api";
+import { measureJunkLocations } from "../junk/api";
+import { listVolumes, type Finding, type Volume } from "./api";
 import { FindingsTable } from "./findings-table";
-import { isSelectable, reclaimable, STEP_LABEL } from "./full-scan";
+import { compareFindings, isSelectable, reclaimable, STEP_LABEL } from "./full-scan";
 import { useFullScan } from "./use-full-scan";
 import { VolumeCard } from "./volume-card";
 
@@ -47,6 +48,23 @@ export function OverviewPage() {
     void loadVolumes(listVolumes);
   };
 
+  const remeasure = async (cleaned: Finding[]) => {
+    if (cleaned.length === 0) return;
+    const fresh = await measureJunkLocations(cleaned.map((f) => f.id)).catch(() => []);
+    const remaining = cleaned.flatMap((finding) => {
+      const location = fresh.find((l) => l.id === finding.id);
+      return location && location.size > 0 && location.targets.length > 0
+        ? [{ ...finding, size: location.size, targets: location.targets }]
+        : [];
+    });
+    if (remaining.length === 0) return;
+    scan.setResult((current) =>
+      current
+        ? { ...current, findings: [...current.findings, ...remaining].sort(compareFindings) }
+        : current,
+    );
+  };
+
   const trash = () => {
     const targets = chosen.flatMap((f) => f.targets);
     cleanup.request({
@@ -57,16 +75,13 @@ export function OverviewPage() {
       execute: () => moveToTrash(targets),
       onDone: (report) => {
         const done = succeededSet(report);
+        const cleared = (f: Finding) => f.targets.every((t) => done.has(t));
         scan.setResult((current) =>
-          current
-            ? {
-                ...current,
-                findings: current.findings.filter((f) => !f.targets.every((t) => done.has(t))),
-              }
-            : current,
+          current ? { ...current, findings: current.findings.filter((f) => !cleared(f)) } : current,
         );
         selection.clear();
         void loadVolumes(listVolumes);
+        void remeasure(chosen.filter((f) => f.category === "vi-tri-rac" && cleared(f)));
       },
     });
   };
