@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::features::junk::model::Safety;
@@ -39,6 +40,7 @@ pub struct Guard {
     home: Option<PathBuf>,
     system: Vec<PathBuf>,
     allowed: Vec<PathBuf>,
+    mounts: Vec<PathBuf>,
 }
 
 impl Guard {
@@ -47,7 +49,35 @@ impl Guard {
             home,
             system,
             allowed,
+            mounts: Vec::new(),
         }
+    }
+
+    pub fn with_mounts(mut self, mounts: Vec<PathBuf>) -> Self {
+        self.mounts = mounts;
+        self
+    }
+
+    fn check_mounts(&self, path: &Path) -> Result<(), String> {
+        for mount in &self.mounts {
+            if same(path, mount) || within(mount, path) {
+                return Err("Đường dẫn thuộc vùng hệ thống được bảo vệ.".to_string());
+            }
+            let Ok(rest) = path.strip_prefix(mount) else {
+                continue;
+            };
+            let Some(name) = rest.components().next() else {
+                continue;
+            };
+            let root = mount.join(name);
+            if same(path, &root) {
+                return Err("Không được xoá thư mục gốc của ổ đĩa.".to_string());
+            }
+            if fs::symlink_metadata(&root).is_ok_and(|m| m.file_type().is_symlink()) {
+                return Err("Đường dẫn đi qua liên kết tới ổ hệ thống.".to_string());
+            }
+        }
+        Ok(())
     }
 
     pub fn for_platform() -> Self {
@@ -71,7 +101,6 @@ impl Guard {
                 "/etc",
                 "/var",
                 "/opt",
-                "/Volumes",
             ]
             .iter()
             .map(PathBuf::from)
@@ -87,7 +116,12 @@ impl Guard {
             .filter(|r| r.os == std::env::consts::OS && r.safety != Safety::KhongDongVao)
             .filter_map(|r| junk::resolve_path(&r.path, junk::system_variable))
             .collect();
-        Self::new(home, system, allowed)
+        let mounts = if cfg!(windows) {
+            Vec::new()
+        } else {
+            vec![PathBuf::from("/Volumes")]
+        };
+        Self::new(home, system, allowed).with_mounts(mounts)
     }
 
     pub fn check(&self, path: &Path) -> Result<(), String> {
@@ -112,6 +146,7 @@ impl Guard {
         {
             return Err("Không được xoá thư mục người dùng.".to_string());
         }
+        self.check_mounts(path)?;
         if self.allowed.iter().any(|a| same(path, a)) {
             return Err("Chỉ dọn nội dung bên trong thư mục này.".to_string());
         }
@@ -185,6 +220,27 @@ mod tests {
         assert!(within(&r.join("ab").join("c"), &r.join("ab")));
         assert!(!within(&r.join("abc"), &r.join("ab")));
         assert!(!within(&r.join("ab"), &r.join("ab")));
+    }
+
+    #[test]
+    fn allows_files_on_mounted_volumes_only_below_their_root() {
+        let dir = std::env::temp_dir().join(format!("betaclean-guard-{}", std::process::id()));
+        let mounts = dir.join("Volumes");
+        let data = mounts.join("Data");
+        fs::create_dir_all(data.join("Phim")).unwrap();
+        let g = guard().with_mounts(vec![mounts.clone()]);
+        assert!(g.check(&data.join("Phim").join("a.mkv")).is_ok());
+        assert!(g.check(&data.join("Phim")).is_ok());
+        assert!(g.check(&data).is_err());
+        assert!(g.check(&mounts).is_err());
+        assert!(g.check(&dir).is_err());
+        #[cfg(unix)]
+        {
+            let link = mounts.join("Macintosh HD");
+            std::os::unix::fs::symlink(&data, &link).unwrap();
+            assert!(g.check(&link.join("Phim").join("a.mkv")).is_err());
+        }
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[cfg(windows)]
