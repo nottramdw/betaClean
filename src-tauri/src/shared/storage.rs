@@ -86,7 +86,7 @@ mod tests {
         let _ = fs::remove_file(&link);
         fs::write(&original, vec![3u8; 4096]).unwrap();
         fs::hard_link(&original, &link).unwrap();
-        fs::copy(&original, &copy).unwrap();
+        fs::write(&copy, vec![3u8; 4096]).unwrap();
         assert_eq!(key(&original), key(&link));
         assert_ne!(key(&original), key(&copy));
         for path in [original, link, copy] {
