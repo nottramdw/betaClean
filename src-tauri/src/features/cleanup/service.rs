@@ -449,6 +449,97 @@ mod tests {
         assert!(history[1].success);
     }
 
+    #[cfg(target_os = "macos")]
+    struct MountedVolume {
+        image: PathBuf,
+        mount: PathBuf,
+    }
+
+    #[cfg(target_os = "macos")]
+    impl MountedVolume {
+        fn attach(name: &str) -> Self {
+            use std::process::Command;
+            let volume = format!("BetacleanTest-{name}-{}", std::process::id());
+            let image = std::env::temp_dir().join(format!("{volume}.dmg"));
+            let _ = fs::remove_file(&image);
+            let created = Command::new("hdiutil")
+                .args([
+                    "create", "-quiet", "-size", "20m", "-fs", "APFS", "-volname",
+                ])
+                .arg(&volume)
+                .arg(&image)
+                .status()
+                .unwrap();
+            assert!(created.success());
+            let attached = Command::new("hdiutil")
+                .args(["attach", "-quiet", "-nobrowse"])
+                .arg(&image)
+                .status()
+                .unwrap();
+            assert!(attached.success());
+            let mount = PathBuf::from("/Volumes").join(&volume);
+            assert!(mount.is_dir());
+            Self { image, mount }
+        }
+
+        fn file(&self, name: &str, size: usize) -> String {
+            let dir = self.mount.join("du-lieu");
+            fs::create_dir_all(&dir).unwrap();
+            let path = dir.join(name);
+            fs::write(&path, vec![2u8; size]).unwrap();
+            path.to_string_lossy().into_owned()
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    impl Drop for MountedVolume {
+        fn drop(&mut self) {
+            let _ = std::process::Command::new("hdiutil")
+                .args(["detach", "-quiet", "-force"])
+                .arg(&self.mount)
+                .status();
+            let _ = fs::remove_file(&self.image);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn cleans_files_on_mounted_volume() {
+        let f = Fixture::new("volume");
+        let volume = MountedVolume::attach("clean");
+        let guard = Guard::for_platform();
+        let root = volume.mount.to_string_lossy().into_owned();
+
+        let report = f
+            .store
+            .move_to_trash(&guard, std::slice::from_ref(&root), true)
+            .unwrap();
+        assert_eq!(report.failed.len(), 1);
+        assert!(volume.mount.is_dir());
+
+        let trashed = volume.file("rac.bin", 4096);
+        let report = f
+            .store
+            .move_to_trash(&guard, std::slice::from_ref(&trashed), true)
+            .unwrap();
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert!(!Path::new(&trashed).exists());
+
+        let suspect = volume.file("nghi-van.bin", 8192);
+        let report = f
+            .store
+            .quarantine(&guard, &request(&suspect), true)
+            .unwrap();
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert_eq!(report.bytes, 8192);
+        assert!(!Path::new(&suspect).exists());
+
+        let id = f.store.list_quarantine()[0].id.clone();
+        let report = f.store.restore(&[id], true).unwrap();
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert_eq!(fs::read(&suspect).unwrap().len(), 8192);
+    }
+
     #[test]
     fn guard_blocks_before_any_change() {
         let f = Fixture::new("guard");
