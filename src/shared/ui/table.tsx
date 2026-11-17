@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { CopyPath, RevealName } from "./path-actions";
 
 export function Table({ children }: { children: ReactNode }) {
   return <table className="w-full table-fixed border-collapse text-sm">{children}</table>;
@@ -20,15 +21,29 @@ export function Td({ children, className = "" }: { children?: ReactNode; classNa
   );
 }
 
-export function PathCell({ title, path }: { title: string; path: string }) {
+export function PathCell({
+  title,
+  path,
+  target = path,
+}: {
+  title: string;
+  path: string;
+  target?: string | null;
+}) {
+  if (!target) {
+    return (
+      <div className="min-w-0">
+        <p className="truncate font-medium text-slate-900" title={title}>
+          {title}
+        </p>
+        <p className="truncate text-xs text-slate-500">{path}</p>
+      </div>
+    );
+  }
   return (
     <div className="min-w-0">
-      <p className="truncate font-medium text-slate-900" title={title}>
-        {title}
-      </p>
-      <p className="selectable truncate font-mono text-xs text-slate-500" title={path}>
-        {path}
-      </p>
+      <RevealName path={target}>{title}</RevealName>
+      <CopyPath path={target}>{path}</CopyPath>
     </div>
   );
 }

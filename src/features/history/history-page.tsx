@@ -74,7 +74,11 @@ export function HistoryPage({ active }: { active: boolean }) {
                     </Badge>
                   </Td>
                   <Td>
-                    <PathCell title={fileName(entry.path)} path={parentDir(entry.path)} />
+                    <PathCell
+                      title={fileName(entry.path)}
+                      path={parentDir(entry.path)}
+                      target={entry.path}
+                    />
                     {entry.error && (
                       <p className="selectable mt-0.5 truncate text-xs text-danger">
                         {entry.error}

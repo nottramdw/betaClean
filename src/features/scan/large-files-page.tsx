@@ -126,7 +126,11 @@ export function LargeFilesPage() {
                     />
                   </Td>
                   <Td>
-                    <PathCell title={fileName(file.path)} path={parentDir(file.path)} />
+                    <PathCell
+                      title={fileName(file.path)}
+                      path={parentDir(file.path)}
+                      target={file.path}
+                    />
                   </Td>
                   <Td className="text-slate-600">{formatDay(file.modified)}</Td>
                   <Td className="text-right font-medium tabular-nums text-slate-700">

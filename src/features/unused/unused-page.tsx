@@ -129,7 +129,11 @@ export function UnusedPage() {
                     />
                   </Td>
                   <Td>
-                    <PathCell title={fileName(file.path)} path={parentDir(file.path)} />
+                    <PathCell
+                      title={fileName(file.path)}
+                      path={parentDir(file.path)}
+                      target={file.path}
+                    />
                   </Td>
                   <Td>
                     <p className="text-slate-700">{formatDay(file.lastUsed)}</p>

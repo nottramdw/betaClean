@@ -156,7 +156,11 @@ export function DuplicatesPage() {
                       onChange={() => selection.toggle(file.path)}
                     />
                     <div className="min-w-0 flex-1">
-                      <PathCell title={fileName(file.path)} path={parentDir(file.path)} />
+                      <PathCell
+                        title={fileName(file.path)}
+                        path={parentDir(file.path)}
+                        target={file.path}
+                      />
                     </div>
                     <span className="shrink-0 text-xs text-slate-500">
                       {formatDay(file.modified)}

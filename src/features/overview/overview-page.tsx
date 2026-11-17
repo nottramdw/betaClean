@@ -9,6 +9,7 @@ import { useTask } from "../../shared/hooks/use-task";
 import { ActionBar } from "../../shared/ui/action-bar";
 import { Button } from "../../shared/ui/button";
 import { EmptyState, Notice, PageHeader, Panel, StatCard } from "../../shared/ui/page";
+import { CopyPath } from "../../shared/ui/path-actions";
 import { ScanProgressPanel } from "../../shared/ui/scan-progress-panel";
 import { listVolumes, type Volume } from "./api";
 import { FindingsTable } from "./findings-table";
@@ -165,12 +166,9 @@ export function OverviewPage() {
               {result.report.hotspots.map((spot) => (
                 <li key={spot.path} className="px-5 py-3">
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span
-                      className="selectable truncate font-mono text-xs text-slate-700"
-                      title={spot.path}
-                    >
+                    <CopyPath path={spot.path} className="text-slate-700">
                       {shortenPath(spot.path, 42)}
-                    </span>
+                    </CopyPath>
                     <span className="shrink-0 font-medium tabular-nums text-slate-800">
                       {formatBytes(spot.size)}
                     </span>

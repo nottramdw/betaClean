@@ -114,6 +114,7 @@ export function QuarantinePage({ active }: { active: boolean }) {
                     <PathCell
                       title={fileName(entry.originalPath)}
                       path={parentDir(entry.originalPath)}
+                      target={entry.originalPath}
                     />
                   </Td>
                   <Td>

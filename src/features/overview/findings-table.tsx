@@ -3,6 +3,7 @@ import { formatBytes } from "../../shared/format";
 import { SafetyBadge } from "../../shared/ui/badge";
 import { SelectAll } from "../../shared/ui/select-all";
 import { Checkbox, Table, Td, Th } from "../../shared/ui/table";
+import { CopyPath, RevealName } from "../../shared/ui/path-actions";
 import { CATEGORY_LABEL, type Finding } from "./api";
 import { isSelectable } from "./full-scan";
 
@@ -48,18 +49,15 @@ export function FindingsTable({
               )}
             </Td>
             <Td>
-              <p className="truncate font-medium text-slate-900">
-                {finding.title}
-                <span className="ml-2 text-xs font-normal text-slate-400">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <RevealName path={finding.path} className="min-w-0">
+                  {finding.title}
+                </RevealName>
+                <span className="shrink-0 text-xs text-slate-400">
                   {CATEGORY_LABEL[finding.category]}
                 </span>
-              </p>
-              <p
-                className="selectable truncate font-mono text-xs text-slate-500"
-                title={finding.path}
-              >
-                {finding.path}
-              </p>
+              </div>
+              <CopyPath path={finding.path} />
               <p className="mt-0.5 text-xs text-slate-500">
                 {finding.reason}{" "}
                 <span className={finding.safety === "chi-thong-bao" ? "font-medium text-info" : ""}>

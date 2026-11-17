@@ -137,7 +137,11 @@ export function MemoryPage({ active }: { active: boolean }) {
               {apps.map((app) => (
                 <tr key={app.id} className="hover:bg-slate-50">
                   <Td>
-                    <PathCell title={app.name} path={app.path ?? "Không xác định được vị trí"} />
+                    <PathCell
+                      title={app.name}
+                      path={app.path ?? "Không xác định được vị trí"}
+                      target={app.path}
+                    />
                   </Td>
                   <Td className="text-right tabular-nums text-slate-600">
                     {formatCount(app.pids.length)}

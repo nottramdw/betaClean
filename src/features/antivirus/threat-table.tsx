@@ -39,7 +39,11 @@ export function ThreatTable({
               />
             </Td>
             <Td>
-              <PathCell title={fileName(threat.path)} path={parentDir(threat.path)} />
+              <PathCell
+                title={fileName(threat.path)}
+                path={parentDir(threat.path)}
+                target={threat.path}
+              />
             </Td>
             <Td>
               <div className="flex flex-wrap gap-1">

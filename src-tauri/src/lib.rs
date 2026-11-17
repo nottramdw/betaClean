@@ -11,6 +11,7 @@ pub fn run() {
         .manage(memory::commands::MemoryState::default())
         .invoke_handler(tauri::generate_handler![
             system::commands::get_system_info,
+            system::commands::reveal_path,
             scan::commands::scan_large_files,
             scan::commands::scan_duplicates,
             scan::commands::scan_temporary_files,
