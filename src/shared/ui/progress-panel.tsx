@@ -13,7 +13,7 @@ export function ProgressPanel({
   const known = percent !== undefined && percent !== null && Number.isFinite(percent);
   const value = known ? Math.max(0, Math.min(100, percent)) : 0;
   return (
-    <div className="mb-6 rounded-xl border border-line bg-white p-5 shadow-sm">
+    <div className="mb-6 rounded-xl border border-line bg-white p-5 shadow-card">
       <div className="flex items-center justify-between gap-4 text-sm">
         <div className="flex min-w-0 items-center gap-2 text-slate-700">
           <LoaderCircle size={16} className="shrink-0 animate-spin text-primary" />

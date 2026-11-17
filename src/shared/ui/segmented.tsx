@@ -17,7 +17,7 @@ export function Segmented<T extends string | number>({
           type="button"
           disabled={disabled}
           onClick={() => onChange(option.value)}
-          className={`h-8 rounded-md px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+          className={`h-8 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-200 disabled:cursor-not-allowed ${
             option.value === value ? "bg-primary text-white" : "text-slate-600 hover:bg-slate-100"
           }`}
         >

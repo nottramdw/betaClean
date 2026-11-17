@@ -130,7 +130,7 @@ export function OverviewPage() {
       )}
       {volumes.error && <Notice notice={{ kind: "error", text: volumes.error }} />}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-4">
         {shownVolumes.slice(0, 2).map((volume) => (
           <VolumeCard key={volume.mount} volume={volume} />
         ))}
@@ -201,7 +201,7 @@ export function OverviewPage() {
       {result && (
         <div className="grid grid-cols-12 gap-6">
           <Panel
-            className="col-span-12 xl:col-span-8"
+            className="col-span-12 @5xl:col-span-8 @[100rem]:col-span-9"
             title={`Đề xuất dọn dẹp (${findings.length})`}
             aside={`${result.virusSkipped ? "Bỏ qua quét virus · " : ""}${formatDate(result.report.generatedAt)}`}
           >
@@ -217,7 +217,10 @@ export function OverviewPage() {
             )}
           </Panel>
 
-          <Panel className="col-span-12 xl:col-span-4" title="Vùng chiếm nhiều dung lượng">
+          <Panel
+            className="col-span-12 @5xl:col-span-4 @[100rem]:col-span-3"
+            title="Vùng chiếm nhiều dung lượng"
+          >
             <ul className="divide-y divide-slate-100">
               {result.report.hotspots.map((spot) => (
                 <li key={spot.path} className="px-5 py-3">

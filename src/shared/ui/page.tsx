@@ -13,15 +13,17 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex items-start justify-between gap-6">
-      <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+    <header className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0 flex-1 basis-80">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
           {meta}
         </div>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-pretty text-slate-500">
+          {description}
+        </p>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
@@ -39,10 +41,10 @@ export function Panel({
 }) {
   return (
     <section
-      className={`overflow-hidden rounded-xl border border-line bg-white shadow-sm ${className}`}
+      className={`overflow-hidden supports-[overflow:clip]:overflow-clip rounded-xl border border-line bg-white shadow-card ${className}`}
     >
       {title && (
-        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-3.5">
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
           {aside && <div className="text-xs text-slate-500">{aside}</div>}
         </div>
@@ -66,10 +68,14 @@ export function StatCard({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col rounded-xl border border-line bg-white p-5 shadow-sm">
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className={`mt-2 text-2xl font-bold tabular-nums ${tone}`}>{value}</span>
-      {hint && <span className="mt-1 text-xs text-slate-500">{hint}</span>}
+    <div className="flex min-w-0 flex-col rounded-xl border border-line bg-white p-5 shadow-card">
+      <span className="truncate text-sm text-slate-500">{label}</span>
+      <span className={`mt-2 truncate text-2xl font-bold tracking-tight tabular-nums ${tone}`}>
+        {value}
+      </span>
+      {hint && (
+        <span className="mt-1 text-xs leading-relaxed text-pretty text-slate-500">{hint}</span>
+      )}
       {children}
     </div>
   );
@@ -85,12 +91,14 @@ export function EmptyState({
   hint?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+    <div className="flex animate-fade-in flex-col items-center justify-center px-6 py-14 text-center">
       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
         {icon}
       </div>
       <p className="text-sm font-medium text-slate-800">{title}</p>
-      {hint && <p className="mt-1 max-w-md text-xs text-slate-500">{hint}</p>}
+      {hint && (
+        <p className="mt-1 max-w-md text-xs leading-relaxed text-pretty text-slate-500">{hint}</p>
+      )}
     </div>
   );
 }
@@ -116,7 +124,7 @@ export type NoticeData = { kind: NoticeKind; text: string; details?: string[] };
 export function Notice({ notice, onClose }: { notice: NoticeData; onClose?: () => void }) {
   return (
     <div
-      className={`mb-4 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${NOTICE_STYLE[notice.kind]}`}
+      className={`mb-4 flex animate-fade-in items-start gap-3 rounded-lg border px-4 py-3 text-sm ${NOTICE_STYLE[notice.kind]}`}
     >
       <span className="mt-0.5 shrink-0">{NOTICE_ICON[notice.kind]}</span>
       <div className="min-w-0 flex-1">
@@ -135,7 +143,7 @@ export function Notice({ notice, onClose }: { notice: NoticeData; onClose?: () =
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 text-xs font-medium opacity-70 hover:opacity-100"
+          className="shrink-0 rounded text-xs font-medium opacity-70 transition-opacity hover:opacity-100"
         >
           Đóng
         </button>

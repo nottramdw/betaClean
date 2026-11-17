@@ -1,16 +1,18 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "danger-outline";
 
 const STYLE: Record<Variant, string> = {
-  primary: "bg-primary text-white hover:bg-primary-hover shadow-sm",
-  secondary: "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
+  primary: "bg-primary text-white hover:bg-primary-hover shadow-card",
+  secondary:
+    "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50",
   ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-  danger: "bg-danger text-white hover:bg-red-800 shadow-sm",
-  "danger-outline": "border border-red-300 bg-white text-danger hover:bg-red-50",
+  danger: "bg-danger text-white hover:bg-red-800 shadow-card",
+  "danger-outline":
+    "border border-red-300 bg-white text-danger hover:border-red-400 hover:bg-red-50",
 };
 
-type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
+type Props = ComponentProps<"button"> & {
   variant?: Variant;
   icon?: ReactNode;
 };
@@ -19,7 +21,7 @@ export function Button({ variant = "secondary", icon, className = "", children, 
   return (
     <button
       type="button"
-      className={`inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${STYLE[variant]} ${className}`}
+      className={`inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-medium transition-[background-color,border-color,color,transform] duration-200 enabled:active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 ${STYLE[variant]} ${className}`}
       {...rest}
     >
       {icon}

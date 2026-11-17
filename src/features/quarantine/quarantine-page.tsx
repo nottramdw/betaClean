@@ -75,7 +75,7 @@ export function QuarantinePage({ active }: { active: boolean }) {
       {cleanup.notice}
       {list.error && <Notice notice={{ kind: "error", text: list.error }} />}
 
-      <div className="mb-6 grid grid-cols-2 gap-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 @xl:grid-cols-2">
         <StatCard label="Tệp đang cách ly" value={entries.length} />
         <StatCard label="Tổng dung lượng" value={formatBytes(total)} />
       </div>

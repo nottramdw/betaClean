@@ -108,7 +108,7 @@ export function DuplicatesPage() {
       <ScanProgressPanel tool="duplicates" running={scan.running} root={home} />
 
       {scan.data && (
-        <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 @2xl:grid-cols-3">
           <StatCard label="Nhóm trùng lặp" value={groups.length} />
           <StatCard label="Có thể thu hồi" value={formatBytes(reclaimable)} tone="text-review" />
           <StatCard

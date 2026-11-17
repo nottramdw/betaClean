@@ -79,7 +79,7 @@ export function MemoryPage({ active }: { active: boolean }) {
       {cleanup.notice}
       {usage.error && <Notice notice={{ kind: "error", text: usage.error }} />}
 
-      <div className="mb-6 grid grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 @4xl:grid-cols-4">
         <StatCard
           label="Đang dùng"
           value={report ? `${ratio}%` : "—"}
@@ -106,13 +106,13 @@ export function MemoryPage({ active }: { active: boolean }) {
       <Panel
         title="Theo mức chiếm RAM"
         aside={
-          <label className="flex h-8 items-center gap-2 rounded-lg border border-line px-2.5">
+          <label className="flex h-8 items-center gap-2 rounded-lg border border-line px-2.5 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
             <Search size={14} />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Tìm ứng dụng"
-              className="w-44 bg-transparent text-sm text-slate-700 outline-none"
+              className="w-44 bg-transparent text-sm text-slate-700 outline-none focus-visible:outline-none @4xl:w-60"
             />
           </label>
         }

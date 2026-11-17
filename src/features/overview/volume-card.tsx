@@ -6,7 +6,7 @@ export function VolumeCard({ volume }: { volume: Volume }) {
   const percent = volume.total > 0 ? (volume.used / volume.total) * 100 : 0;
   const tone = percent >= 90 ? "bg-danger" : percent >= 75 ? "bg-review" : "bg-primary";
   return (
-    <div className="rounded-xl border border-line bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-line bg-white p-5 shadow-card">
       <div className="flex items-center gap-2 text-sm text-slate-500">
         <HardDrive size={16} />Ổ {volume.mount}
       </div>

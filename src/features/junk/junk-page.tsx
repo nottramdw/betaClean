@@ -75,7 +75,7 @@ export function JunkPage() {
       {scan.running && <ProgressPanel label="Đang đo dung lượng các vị trí rác" />}
 
       {scan.data && (
-        <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 @2xl:grid-cols-3">
           <StatCard
             label="Tổng dung lượng phát hiện"
             value={formatBytes(total)}
