@@ -8,7 +8,7 @@ Bản cài: tệp `.dmg` mới nhất trong GitHub Release hoặc artifact `beta
 
 | # | Thao tác | Kỳ vọng |
 |---|---|---|
-| 1.1 | Mở DMG, kéo betaClean vào Applications, mở ứng dụng | Ứng dụng mở được (bản chưa notarize: chuột phải → Mở) |
+| 1.1 | Mở DMG, kéo betaClean vào Applications, mở ứng dụng | Ứng dụng mở được. Bản chưa notarize: lần đầu báo "chưa được mở", chọn Xong → System Settings → Privacy & Security → "Vẫn mở" (Open Anyway) → nhập mật khẩu; hoặc chạy `xattr -dr com.apple.quarantine /Applications/betaClean.app` |
 | 1.2 | Cấp Full Disk Access: System Settings → Privacy & Security → Full Disk Access → thêm betaClean, mở lại ứng dụng | Quét không còn báo thiếu quyền với `~/Library/Mail`, `~/Library/Safari` |
 
 ## 2. Quét virus
