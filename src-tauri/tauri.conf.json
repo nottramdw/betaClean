@@ -33,10 +33,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "publisher": "Betacom",
+    "publisher": "nottramdw",
     "category": "Utility",
     "shortDescription": "Dọn dẹp ổ đĩa offline",
-    "copyright": "Betacom",
+    "copyright": "nottramdw",
     "resources": {
       "resources/clamav/": "clamav/"
     },
