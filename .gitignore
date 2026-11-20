@@ -17,3 +17,9 @@ src-tauri/resources/clamav/*
 !src-tauri/resources/clamav/.keep
 release/
 *.tsbuildinfo
+.claude/
+CLAUDE.md
+plans/
+design/
+docs/tien-do.md
+docs/quyet-dinh.md
